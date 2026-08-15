@@ -4,3 +4,8 @@ q2_nested
 q3_flatwatch
 q4_bounds
 q3_ref
+q5_boundary/main
+q5_boundary/lists
+q5_boundary/modes.txt
+q5_boundary/repro_seed
+q5_boundary/repro_fallback

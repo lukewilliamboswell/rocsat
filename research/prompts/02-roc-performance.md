@@ -9,6 +9,10 @@ Already settled, do not re-measure:
 - Nested `List(List(_))` clones the inner list on every append; ~100x, quadratic. ❌
 - A flat block arena in a record is as fast as loose `var`s, and matches `clang -O2` exactly. ✅
 - Bounds-checked `.get(i)?` costs the same as sequential iteration; ~3.9 G reads/sec. ✅
+- **Q1 below is now ANSWERED** — see `spike/q5_boundary/RESULTS.md`. Module/function
+  boundaries are fine; mutating through a record field projection is fragile (28/51 shapes
+  clone); separate list values are robust (11/11). Do not re-run Q1. The RECOMMENDED MODULE
+  STRUCTURE deliverable should be based on that document.
 
 ---
 

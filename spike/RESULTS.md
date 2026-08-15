@@ -115,6 +115,18 @@ bounds checks and all. Roc's ~1.4ms edge in setup is `List.repeat` writing zeros
 
 ---
 
+## Q5 — function and module boundaries (follow-up, `q5_boundary/RESULTS.md`) ⚠️
+
+62 code shapes tested. Module boundaries per se are fine. But **mutating a list through a
+record field projection** (`st.blocks.set(..)`, `{ ..st, blocks: st.blocks.set(..) }`) is
+*fragile*: 28 of 51 record-shaped variants clone the 32 MB list on every operation, and
+whether a given shape clones depends on whether the record came from a literal or a call,
+whether `?` or `??` was used, and whether the code is in a loop or a callee. Confirmed in
+the LLVM IR: the compiler increfs the projected field before `list_set` in the bad shapes.
+**Separate `List` values as parameters/returns are robust: 11 of 11 shapes in place**,
+including cross-module, `?`, recursion, tuples, `Try`, and rebuilding a record every step.
+This supersedes item 3 below.
+
 ## What this means for rocsat
 
 1. **Viable.** On the access pattern that dominates unit propagation, `--opt=speed` Roc is
@@ -124,24 +136,30 @@ bounds checks and all. Roc's ~1.4ms edge in setup is `List.repeat` writing zeros
    assignment / level / reason / activity arrays — all `List(U32)` or `List(U64)`, indexed
    by integer offset. Any `List(List(_))` in the hot path is a ~100× regression.
    This is what MiniSat does anyway, so the constraint costs nothing in solver design.
-3. **State lives in one record**, threaded through `var` rebinding. Confirmed free.
+3. ~~State lives in one record, threaded through `var` rebinding.~~ **Revised by Q5:** the
+   state record is fine *at rest*, but hot functions must **destructure it into individual
+   list bindings on entry, mutate those, and rebuild on exit** — never mutate through
+   `st.field`. Helpers take the lists they need as separate parameters and return tuples.
 4. **Watch lists need explicit storage management** — fixed-capacity blocks with compaction,
    CSR-style regions, or an intrusive linked list threaded through an index array. This is
    the one place the Roc design differs from a straight MiniSat port, and it needs a real
    decision (see the open questions).
+5. **A CI canary benchmark is mandatory** — a timed n-scaling run of the real propagate
+   loop — because a future nightly can flip a shape from in-place to cloning silently.
 
 ## Open questions this spike did NOT answer
 
 - Watch-list churn under **removal**, not just append. Swap-with-last in a flat block is
   O(1), but blocks that overflow their `cap` need a growth or compaction strategy, and that
   was not measured.
-- Whether uniqueness survives **passing the state record into and out of non-inlined
-  functions** across a module boundary. Everything here was in one file; the real solver
-  will not be. This is the highest-priority follow-up — if a cross-module call breaks
-  uniqueness, the design changes again.
-- `expect` behavior under `--opt=speed` (docs say it is *not yet* compiled out).
+- ~~Whether uniqueness survives passing the state record into and out of non-inlined
+  functions across a module boundary.~~ Answered by Q5 (above).
+- Why nominal-type method dispatch (`$st.step(..)`) is 3× slower than the equivalent plain
+  function call, and whether per-step call overhead (5–14 ns) can be reduced.
+- `expect` behavior under `--opt=speed` — Track C measured: inline `expect` is dropped in
+  every built binary; see `research/03-testing-benchmarking.md`.
 - Whether large `List.repeat` allocations are a startup cost worth avoiding.
-- Anything about recursion depth, `Try` in deeply nested calls, or DRAT proof I/O.
+- Anything about recursion depth or DRAT proof I/O.
 
 ## Files
 
@@ -152,6 +170,7 @@ bounds checks and all. Roc's ~1.4ms edge in setup is `List.repeat` writing zeros
 | `q3_flatwatch.roc` | Q3 — flat block arena, 3 state-threading shapes |
 | `q3_ref.c` | C reference for `q3_flatwatch` |
 | `q4_bounds.roc` | Q4 — bounds-check / access-shape cost |
+| `q5_boundary/` | Q5 — function/module boundaries, 62 shapes; see its own `RESULTS.md` |
 
 Rebuild: `roc build --opt=speed <file>.roc` with the release nightly, not the debug `roc`
 on PATH.
