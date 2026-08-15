@@ -1,0 +1,141 @@
+# Loops
+
+Loops let you run the same code multiple times, in...well, in a loop.
+
+## `for` Loops
+
+A `for` loop lets you run code on each item in an [iterator](iterators). For example:
+
+```roc
+var $sum = 0
+
+for n in 1..<5 {
+    $sum = $sum + n
+}
+```
+
+> `1..<5` is a [range](numbers#ranges): a reusable `Range` describing the numbers from 1 up to (but not including) 5. Writing `1..=5` instead would include the 5. If the bounds are `I64` values, the range is a `Range(I64)`, and its iterator yields `I64` values.
+
+A loop body only includes statements; it does not have a final expression. The loop itself evaluates to `{}`.
+
+### Iterating over types that have `iter`
+
+`for` can also be used on types that have an
+[`iter`](static-dispatch#iteration) method, as long as that method returns an
+[`Iter`](../Iter). The loop then calls `next` on the returned iterator.
+For example, [`List`](../List) has `List.iter`, so you can do a `for`
+loop over a list:
+
+```roc
+var $sum = 0
+
+for n in [1, 2, 3, 4] {
+    $sum = $sum + n
+}
+```
+
+This `[1, 2, 3, 4]` code snippet works the same way as the earlier `1..<5` one. The range stores its bounds and produces an iterator when the loop calls its `iter` method; the list's `iter` method also produces an iterator over the same values. The loop then repeatedly calls `next` on that `Iter`.
+
+### Looping backwards
+
+To visit a list's items from last to first, use `List.iter_rev` instead of
+`iter`:
+
+```roc
+var $visited = []
+
+for n in [1, 2, 3, 4].iter_rev() {
+    $visited = $visited.append(n)
+}
+
+# $visited is now [4, 3, 2, 1]
+```
+
+This reads the list backwards in place. Unlike `List.rev`, it does not build a
+reversed copy of the list first. Dictionaries and sets also provide `iter_rev`
+to traverse their current iteration order backwards. To reverse values from
+another iterator source, first collect them with `List.from_iter`, then call
+`iter_rev` on that list.
+
+### Pattern matching in `for`
+
+Whatever you put between `for` and `in` is treated as a [pattern](pattern-matching), meaning (for example) that the item can be destructured inline:
+
+```roc
+var $total = 0
+for (x, y) in [(1, 2), (3, 4), (5, 6)] {
+    $total = $total + x + y
+}
+```
+
+As usual, you can nest patterns as much as you like, and can use `_` if you don't want to name a pattern:
+
+```roc
+var $count = 0
+for _ in items {
+    $count = $count + 1
+}
+```
+
+Just like with [assignments](statements#assignment), the pattern you use here must be [exhaustive](pattern-matching#exhaustiveness). For example, the following would give an exhaustiveness error because the loop body couldn't know what value to use for `amount_to_add` if the item was ever `Err` at runtime:
+
+```roc
+var $count = 0
+for Ok(amount_to_add) in items {
+    $count = $count + amount_to_add
+}
+```
+
+If you can't write an exhaustive pattern-match, you can name the entire iterator item and then use [`match`](pattern-matching#match) on it inside the loop body.
+
+(Note: the dedicated exhaustiveness error is not implemented yet for `for` patterns, even though it is for [assignments](statements#assignment). Currently, a non-exhaustive tag pattern like this one is reported as a type mismatch instead, and non-exhaustive patterns that the type checker can't rule out—such as a number literal pattern—are not caught at compile time and crash at runtime.)
+
+## `while` Loops
+
+A `while` loop repeatedly executes its body while a condition is true:
+
+```roc
+var $i = 0
+var $sum = 0
+while $i < 5 {
+    $sum = $sum + $i
+    $i = $i + 1
+}
+```
+
+The condition must evaluate to a boolean value.
+
+## `break` Statement
+
+Use `break` to exit the innermost loop immediately:
+
+```roc
+var $sum = 0
+for i in [1, 2, 3, 4, 5] {
+    if i == 4 {
+        break
+    }
+    $sum = $sum + i
+}
+# $sum is 6 (1 + 2 + 3, loop exits before 4)
+```
+
+In nested loops, `break` only exits the innermost loop:
+
+```roc
+var $result = 0
+for i in [1, 2, 3] {
+    for j in [10, 20, 30] {
+        if j == 20 {
+            break  # only exits inner loop
+        }
+        $result = $result + j
+    }
+}
+```
+
+Loops are typically used for [variable reassignment](statements#reassignment) or for calling [effectful functions](functions#effectful-functions).
+
+## Infinite Loops
+
+TODO
