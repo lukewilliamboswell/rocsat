@@ -113,7 +113,9 @@ arithmetic (`plus_wrap`, `times_wrap`, `minus_wrap`, `plus_saturated`) and bit o
 - Exhaustiveness checking (not ported to the new compiler as of 2025-12-01 per the tutorial)
 - `list[i]` subscript operator
 - Nonblocking compilation (`roc check`-then-run)
-- `--opt=speed` does not yet drop `expect`s
+- ~~`--opt=speed` does not yet drop `expect`s~~ — stale in the tutorial; measured on
+  nightly-2026-08-13: speed/size/default builds DROP inline expects, `--opt=dev` and
+  `roc run` keep them (PR #9842). See `research/02-roc-performance.md` Q4.
 
 ## Best help channel
 

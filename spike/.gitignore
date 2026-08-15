@@ -9,3 +9,10 @@ q5_boundary/lists
 q5_boundary/modes.txt
 q5_boundary/repro_seed
 q5_boundary/repro_fallback
+q6_churn/churn
+q7_alloc/alloc
+q7_alloc/bench_out.txt
+q8_misc/exp_*
+q8_misc/cli
+q8_misc/exp
+q8_misc/t

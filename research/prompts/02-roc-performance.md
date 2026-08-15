@@ -1,5 +1,7 @@
 # Track B — Roc performance semantics (REVISED after the spike)
 
+**STATUS: COMPLETE — deliverable is `research/02-roc-performance.md` (2026-08-16).**
+
 The original version of this prompt asked eight questions. The spike in `spike/RESULTS.md`
 answered five of them empirically, so this is now much narrower. Read `spike/RESULTS.md` and
 `roc-docs/NOTES.md` before running this — do not re-litigate settled questions.

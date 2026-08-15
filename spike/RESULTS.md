@@ -127,6 +127,19 @@ the LLVM IR: the compiler increfs the projected field before `list_set` in the b
 including cross-module, `?`, recursion, tuples, `Try`, and rebuilding a record every step.
 This supersedes item 3 below.
 
+## Q6 — watch-list churn with removal (`q6_churn/`) ✅
+
+Track A's pooled flat-block scheme (relocation on overflow, in-loop compaction) beats an
+intrusive linked list by 25–60 % on a propagate-shaped move workload with a clause arena;
+capacity policies cost the same time and differ only in memory; a full rebuild ≈ 10–12 ns
+per watch. Full write-up in `research/02-roc-performance.md` Q2.
+
+## Q7 — allocation and growth (`q7_alloc/`) ✅ (one trap)
+
+`List.repeat` fills at ~15 GB/s; `append` grows geometrically; `set`/`drop_last` keep
+capacity. **`List.reserve(k)` sets capacity to exactly `len + k` — repeated `reserve` is
+quadratic.** Full table in `research/02-roc-performance.md` Q5.
+
 ## What this means for rocsat
 
 1. **Viable.** On the access pattern that dominates unit propagation, `--opt=speed` Roc is
@@ -149,16 +162,14 @@ This supersedes item 3 below.
 
 ## Open questions this spike did NOT answer
 
-- Watch-list churn under **removal**, not just append. Swap-with-last in a flat block is
-  O(1), but blocks that overflow their `cap` need a growth or compaction strategy, and that
-  was not measured.
+- ~~Watch-list churn under **removal**~~ — Q6 above.
 - ~~Whether uniqueness survives passing the state record into and out of non-inlined
   functions across a module boundary.~~ Answered by Q5 (above).
 - Why nominal-type method dispatch (`$st.step(..)`) is 3× slower than the equivalent plain
   function call, and whether per-step call overhead (5–14 ns) can be reduced.
-- `expect` behavior under `--opt=speed` — Track C measured: inline `expect` is dropped in
-  every built binary; see `research/03-testing-benchmarking.md`.
-- Whether large `List.repeat` allocations are a startup cost worth avoiding.
+- ~~`expect` behavior under `--opt=speed`~~ — dropped in speed/size/default builds, kept in
+  `--opt=dev` and `roc run`; see `research/02-roc-performance.md` Q4.
+- ~~Whether large `List.repeat` allocations are a startup cost worth avoiding.~~ No — Q7.
 - Anything about recursion depth or DRAT proof I/O.
 
 ## Files
@@ -171,6 +182,9 @@ This supersedes item 3 below.
 | `q3_ref.c` | C reference for `q3_flatwatch` |
 | `q4_bounds.roc` | Q4 — bounds-check / access-shape cost |
 | `q5_boundary/` | Q5 — function/module boundaries, 62 shapes; see its own `RESULTS.md` |
+| `q6_churn/` | Q6 — watch-list churn: pooled blocks vs linked list, capacity policies |
+| `q7_alloc/` | Q7 — allocation, growth, `reserve` trap |
+| `q8_misc/` | unsafe-op reachability, `expect` per backend, basic-cli 0.22.0 test app |
 
 Rebuild: `roc build --opt=speed <file>.roc` with the release nightly, not the debug `roc`
 on PATH.
