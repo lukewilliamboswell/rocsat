@@ -1,2 +1,13 @@
 # per-task planning documents are local; plans/ROADMAP.md is force-added
 plans/
+
+# build outputs
+src/rocsat
+src/rocsat-dev
+.roc-cache/
+
+# fetched corpora, external tools, run outputs
+bench/corpus/
+bench/tools/
+bench/out/
+*.drat

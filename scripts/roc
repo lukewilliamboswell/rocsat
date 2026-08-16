@@ -1,0 +1,15 @@
+#!/bin/sh
+# Runs the Roc compiler pinned in ../roc-version. Never falls back to a `roc` on PATH.
+# Override with ROC_BIN=/path/to/roc.
+set -eu
+root=$(cd "$(dirname "$0")/.." && pwd)
+tag=$(tr -d '[:space:]' < "$root/roc-version")
+bin=${ROC_BIN:-"$HOME/.roc/$tag/roc"}
+if [ ! -x "$bin" ]; then
+    echo "rocsat: pinned Roc compiler not found at $bin" >&2
+    echo "install: download roc_nightly-<platform>-${tag#nightly-}.tar.gz from" >&2
+    echo "  https://github.com/roc-lang/nightlies/releases/tag/$tag" >&2
+    echo "  and extract it so that $HOME/.roc/$tag/roc exists (or set ROC_BIN)." >&2
+    exit 127
+fi
+exec "$bin" "$@"
