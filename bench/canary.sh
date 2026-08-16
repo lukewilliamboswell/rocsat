@@ -3,6 +3,7 @@
 # in-place loop into a cloning one. Today it measures parser throughput on a generated
 # random 3-SAT file of ~100 MB (the SATLIB files are too small to see past process start-up).
 # Usage: bench/canary.sh [binary]   (default src/rocsat); JSON lands in bench/out/canary.json.
+# Run plugged in: on battery this machine measures ~35 % slower (349 vs 220 MB/s observed).
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 bin=${1:-"$here/../src/rocsat"}
