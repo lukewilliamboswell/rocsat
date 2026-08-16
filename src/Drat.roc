@@ -1,15 +1,22 @@
 # Text DRAT proof lines appended to a byte buffer: `l1 l2 ... 0` adds a clause, `d l1 ... 0`
-# deletes one, a bare `0` is the empty clause. Literals are written as DIMACS integers.
+# deletes one, and a bare `0` is the empty clause. Literals are written as DIMACS integers.
+# Build each line separately: this pinned compiler corrupts a long-lived buffer grown byte by byte.
 
 Drat :: [].{
     add_clause : List(U8), List(U32) -> List(U8)
-    add_clause = |proof, lits| lits.fold(proof, append_lit).append('0').append('\n')
+    add_clause = |proof, lits| {
+        line = lits.fold([], append_lit).append('0').append('\n')
+        proof.concat(line)
+    }
 
     delete_clause : List(U8), List(U32) -> List(U8)
-    delete_clause = |proof, lits| lits.fold(proof.append('d').append(' '), append_lit).append('0').append('\n')
+    delete_clause = |proof, lits| {
+        line = lits.fold("d ".to_utf8(), append_lit).append('0').append('\n')
+        proof.concat(line)
+    }
 
     add_empty : List(U8) -> List(U8)
-    add_empty = |proof| proof.append('0').append('\n')
+    add_empty = |proof| proof.concat("0\n".to_utf8())
 
     append_lit : List(U8), U32 -> List(U8)
     append_lit = |proof, lit| {

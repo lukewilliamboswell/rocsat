@@ -23,6 +23,7 @@ no_clauses_vars.cnf	SAT
 no_trailing_newline.cnf	SAT
 percent_trailer.cnf	SAT
 plus_prefix.cnf	SAT
+proof_buffer_growth.cnf	UNSAT
 tabs_and_spaces.cnf	SAT
 tautology_and_unsat.cnf	UNSAT
 tautology_only.cnf	SAT

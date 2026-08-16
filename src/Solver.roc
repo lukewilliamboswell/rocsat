@@ -78,7 +78,8 @@ Solver :: [].{
                     Skip => {}
                     Keep(kept) => {
                         if proof_on and kept.len() != lits.len() and !kept.is_empty() {
-                            $bytes = Drat.delete_clause(Drat.add_clause($bytes, kept), lits)
+                            added = Drat.add_clause($bytes, kept)
+                            $bytes = Drat.delete_clause(added, lits)
                         }
                         match kept {
                             [] => {

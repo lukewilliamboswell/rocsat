@@ -1,8 +1,9 @@
 # rocsat
 
-A CDCL SAT solver written in [Roc](https://www.roc-lang.org) (the new Zig-based compiler): a
-library with a thin command-line front end. Progress is tracked in `plans/ROADMAP.md`; the design
-notes behind it live in `research/`.
+A CDCL SAT solver written in [Roc](https://www.roc-lang.org) with the new Zig-based compiler.
+The completed core solver is currently exposed through a command-line app; the library API is a
+later milestone. Progress is tracked in `plans/ROADMAP.md`, and its design notes live in
+`research/`.
 
 ## Toolchain
 
@@ -11,12 +12,15 @@ The compiler is pinned in `roc-version`; `scripts/roc` runs that exact nightly f
 tarball for your platform from `https://github.com/roc-lang/nightlies/releases/tag/<tag>` and
 extract it so that `~/.roc/<tag>/roc` exists.
 
-External tools for the test harness (CaDiCaL as status oracle, drat-trim, cnfuzz, cnfdd,
-dimocheck, hyperfine, `uv` for the Python scripts — PySAT is a script dependency `uv` fetches)
-and the SATLIB corpora are installed once:
+The harness also needs standard build tools plus CaDiCaL, drat-trim, cnfuzz, cnfdd, dimocheck,
+hyperfine, and `uv`; PySAT is a script dependency that `uv` fetches. The bootstrap scripts
+currently target macOS (`brew` and BSD `sed`):
 
-    bench/tools.sh     # brew + builds into bench/tools/
-    bench/fetch.sh     # SATLIB into bench/corpus/
+    bench/tools.sh     # installs packages and builds tools into bench/tools/
+    bench/fetch.sh     # downloads SATLIB into bench/corpus/
+
+On other platforms, install or build the same tools and fetch the same corpora with the local
+platform's equivalents.
 
 ## Building and checking
 
