@@ -1,0 +1,1 @@
+700 ns per chain clause: 2x the 336 ns measured on 2026-08-16 (M-series laptop on mains power)

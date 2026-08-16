@@ -2,7 +2,6 @@
 
 import glob
 import os
-import re
 import subprocess
 import tempfile
 import time
@@ -85,13 +84,56 @@ def header_vars(path):
     return 0
 
 
+def parse_cnf(data):
+    """Lenient DIMACS reader (what the solver accepts: `c` lines, `p` line, `+` prefixes, a `%`
+    trailer, header counts that are wrong). Returns (num_vars, clauses)."""
+    num_vars, clauses, cur = 0, [], []
+    for line in data.decode(errors="replace").splitlines():
+        if line.startswith("c"):
+            continue
+        toks = line.split()
+        if not toks:
+            continue
+        if toks[0] == "%":
+            break
+        if toks[0] == "p":
+            num_vars = int(toks[2])
+            continue
+        for t in toks:
+            v = int(t.lstrip("+"))
+            if v == 0:
+                clauses.append(cur)
+                cur = []
+            else:
+                cur.append(v)
+                num_vars = max(num_vars, abs(v))
+    return num_vars, clauses
+
+
 def sanitized(path):
-    """The instance rewritten into strict DIMACS for tools (CaDiCaL, dimocheck) that reject the
-    leniencies our parser accepts: `+` prefixes are dropped, a `%` trailer is cut, and the file
-    ends in a newline."""
-    data = open(path, "rb").read()
-    body, _, _ = data.partition(b"\n%")
-    return re.sub(rb"(?<![\w-])\+(?=\d)", b"", body).rstrip(b"\r\n") + b"\n"
+    """The instance re-serialised as strict DIMACS (correct header, no `+`, no `%` trailer) for
+    tools that reject the leniencies our parser accepts: CaDiCaL, dimocheck, drat-trim."""
+    num_vars, clauses = parse_cnf(open(path, "rb").read())
+    lines = [f"p cnf {num_vars} {len(clauses)}"] + [" ".join(map(str, c + [0])) for c in clauses]
+    return ("\n".join(lines) + "\n").encode()
+
+
+def check_proof(cnf, proof, timeout):
+    """None if drat-trim verifies `proof` against the (sanitised) instance, else a reason."""
+    drat_trim = tool("drat-trim")
+    if not drat_trim:
+        return "drat-trim not built (bench/tools.sh)"
+    if not os.path.isfile(proof):
+        return "no proof file written"
+    strict = temp_file(sanitized(cnf), ".cnf")
+    try:
+        rc, out, _, _ = run([drat_trim, strict, proof], timeout)
+    finally:
+        os.unlink(strict)
+    if b"s VERIFIED" not in out:
+        last = out.decode(errors="replace").strip().splitlines()[-1:]
+        return "drat-trim: " + (last[0] if last else "no output")
+    return None
 
 
 def temp_file(data, suffix):

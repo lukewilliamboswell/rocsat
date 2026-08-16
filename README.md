@@ -24,15 +24,22 @@ and the SATLIB corpora are installed once:
     make build-dev     # --opt=dev    -> src/rocsat-dev (keeps inline `expect`s)
     make test          # roc test over src/
     make check         # test + regression set + 30 s fuzz; what every commit must pass
-    make canary        # hyperfine timing canary (bench/canary.sh)
+    make canary        # timing canary: ns per clause on a 2 M implication chain vs bench/canary-ceiling.txt
 
-`src/rocsat <command> <file.cnf>`: `parse`, `brute` (enumeration reference, ≤ 24 vars),
-`check <cnf> <model>`, `version`, `help`. Solving subcommands print SAT-competition output and
-exit 10 (SAT) / 20 (UNSAT).
+`src/rocsat <command> ...`: `solve <cnf> [proof.drat]` (CDCL; writes a text DRAT proof when a
+path is given), `parse <cnf>`, `brute <cnf>` (enumeration reference, ≤ 24 vars), `check <cnf>
+<model>`, `version`, `help`. Solving subcommands print `c` statistics, then SAT-competition
+`s`/`v` lines, and exit 10 (SAT) / 20 (UNSAT).
+
+Solver structure (`src/`): `Core` (state record, arena, watch pool, trail primitives), `Propagate`
+(2WL unit propagation), `Analyze` (1-UIP), `Drat` (proof lines), `Solver` (clause input, search
+loop, model). Hot code takes and returns lists, never the state record — the header of
+`src/Core.roc` explains why and what shapes this Roc nightly keeps in place.
 
 ## Layout
 
-- `src/` — the Roc app (`main.roc`) and modules (`Dimacs`, `Model`, `Brute`, …)
+- `src/` — the Roc app (`main.roc`) and modules (`Dimacs`, `Model`, `Brute`, `Core`, `Propagate`,
+  `Analyze`, `Drat`, `Solver`)
 - `bench/` — harness: `run.py` (instance sets, model/proof checks, PAR-2), `fuzz.py`,
   `expected.py` (reference statuses in `bench/expected/`), `regression.txt`, `canary.sh`
 - `tests/edge/` — hand-written edge-case CNFs

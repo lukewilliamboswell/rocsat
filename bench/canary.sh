@@ -1,32 +1,40 @@
 #!/bin/sh
-# Timing canary: hyperfine min-of-N on fixed inputs, to catch a nightly or a refactor turning an
-# in-place loop into a cloning one. Today it measures parser throughput on a generated
-# random 3-SAT file of ~100 MB (the SATLIB files are too small to see past process start-up).
+# Timing canary: hyperfine min-of-N on a fixed generated input, to catch a nightly or a refactor
+# turning an in-place loop into a copying one (that failure is quadratic, so it shows up as a
+# multiple, not a percentage). The input is an implication chain (¬x_i ∨ x_{i+1}) with the unit
+# x1 last, so `add_clauses` attaches N-1 binary clauses and then one level-0 propagation walks
+# the whole chain: N propagations, no conflicts, then N model literals printed. Reported: ns per
+# clause = (solve − parse) / N (attach + propagate + output; ~1/3 is output), compared with the
+# hard ceiling in bench/canary-ceiling.txt (2× a healthy run; a regression must be understood,
+# not accepted).
 # Usage: bench/canary.sh [binary]   (default src/rocsat); JSON lands in bench/out/canary.json.
-# Run plugged in: on battery this machine measures ~35 % slower (349 vs 220 MB/s observed).
+# Run plugged in: on battery this machine measures ~35 % slower.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 bin=${1:-"$here/../src/rocsat"}
 out="$here/out"
 mkdir -p "$out"
-big="$out/canary-3sat-1M.cnf"
+n=2000000
+big="$out/canary-chain-2M.cnf"
 if [ ! -f "$big" ]; then
     echo "generating $big"
-    uv run python - "$big" <<'EOF'
-import random, sys
-rng = random.Random(20260816)
-n, m = 1_000_000, 4_000_000
+    uv run python - "$big" "$n" <<'EOF'
+import sys
+n = int(sys.argv[2])
 with open(sys.argv[1], "w") as f:
-    f.write(f"p cnf {n} {m}\n")
-    for _ in range(m):
-        f.write(" ".join(str(rng.randint(1, n) * rng.choice((1, -1))) for _ in range(3)) + " 0\n")
+    f.write(f"p cnf {n} {n}\n")
+    for i in range(1, n):
+        f.write(f"-{i} {i + 1} 0\n")
+    f.write("1 0\n")
 EOF
 fi
-size_mb=$(uv run python -c "import os,sys; print(round(os.path.getsize(sys.argv[1])/1e6,1))" "$big")
-echo "canary: parse ${size_mb} MB"
-hyperfine --warmup 1 --min-runs 5 --export-json "$out/canary.json" "$bin parse $big"
-uv run python - "$out/canary.json" "$size_mb" <<'EOF'
+echo "canary: propagate chain of $n"
+hyperfine --warmup 1 --min-runs 5 --ignore-failure --export-json "$out/canary.json" "$bin parse $big" "$bin solve $big >/dev/null"
+uv run python - "$out/canary.json" "$n" "$here/canary-ceiling.txt" <<'EOF'
 import json, sys
-r = json.load(open(sys.argv[1]))["results"][0]
-print(f"min {r['min']:.3f}s  ->  {float(sys.argv[2]) / r['min']:.0f} MB/s")
+parse, solve = [r["min"] for r in json.load(open(sys.argv[1]))["results"]]
+ns = (solve - parse) / int(sys.argv[2]) * 1e9
+ceiling = float(open(sys.argv[3]).read().split()[0])
+print(f"parse min {parse:.3f}s  solve min {solve:.3f}s  ->  {ns:.1f} ns per clause (ceiling {ceiling:.0f})")
+sys.exit(0 if ns <= ceiling else 1)
 EOF

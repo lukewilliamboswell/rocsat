@@ -45,18 +45,6 @@ def check_model(binary, cnf, stdout, timeout):
         os.unlink(model)
 
 
-def check_proof(cnf, proof, timeout):
-    drat_trim = common.tool("drat-trim")
-    if not drat_trim:
-        return "drat-trim not built (bench/tools.sh)"
-    if not os.path.isfile(proof):
-        return "no proof file written"
-    rc, out, _, _ = common.run([drat_trim, cnf, proof], timeout)
-    if b"s VERIFIED" not in out:
-        return "drat-trim: " + out.decode(errors="replace").strip().splitlines()[-1:][0] if out else "drat-trim: no output"
-    return None
-
-
 def run_one(args, cnf, expected):
     name = os.path.relpath(cnf, common.ROOT)
     result = {"instance": name, "expected": expected}
@@ -87,7 +75,7 @@ def run_one(args, cnf, expected):
         elif got == "SAT":
             fail = check_model(args.binary, cnf, out, args.timeout)
         elif args.drat:
-            fail = check_proof(cnf, proof, args.timeout)
+            fail = common.check_proof(cnf, proof, args.timeout)
         if fail is None and args.rerun:
             rc2, out2, _, _ = common.run(cmd, args.timeout)
             if rc2 != rc or out2 != out:

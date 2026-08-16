@@ -48,3 +48,7 @@ Diff-level hygiene cannot prevent it: complexity accumulates in the seams no sin
   PEP 723 header; ad-hoc snippets use `uv run python`.
 - Roc multi-line strings use `\\` line prefixes (see `roc-docs/all_syntax_test.roc`), not
   `Str.join_with`.
+- Roc hot code: lists in flight, never the state record — functions take the lists they mutate
+  as parameters and return them in a tuple; writes go through `Core.put`; no `drop_last`/
+  `take_first` on hot lists. The header of `src/Core.roc` states the rules and why each exists;
+  a scaling canary (`make canary`) guards them.

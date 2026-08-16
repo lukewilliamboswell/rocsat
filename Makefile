@@ -1,5 +1,6 @@
 ROC := scripts/roc
-SOLVER := brute
+SOLVER := solve
+# Instance-size cap for the fuzz generators (the brute reference is capped at 24 variables).
 MAX_VARS := 24
 
 .PHONY: build build-dev test check regression fuzz canary
@@ -14,10 +15,10 @@ test:
 	$(ROC) test src/main.roc
 
 regression: build
-	uv run --script bench/run.py src/rocsat $(SOLVER) bench/regression.txt --max-vars $(MAX_VARS)
+	uv run --script bench/run.py src/rocsat $(SOLVER) bench/regression.txt --drat
 
 fuzz: build build-dev
-	uv run --script bench/fuzz.py --subcommand $(SOLVER) --max-vars $(MAX_VARS) --seconds 30 --tiny
+	uv run --script bench/fuzz.py --subcommand $(SOLVER) --max-vars $(MAX_VARS) --seconds 30 --tiny --drat
 
 canary: build
 	bench/canary.sh

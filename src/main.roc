@@ -7,6 +7,7 @@ import pf.Path
 import Dimacs
 import Model
 import Brute
+import Solver
 
 version = "0.0.0"
 
@@ -15,6 +16,7 @@ usage =
     \\
     \\commands:
     \\  parse <file.cnf>  read a DIMACS file and print its size
+    \\  solve <file.cnf> [proof.drat]  CDCL solve; exit 10 SAT / 20 UNSAT; DRAT proof if a path is given
     \\  brute <file.cnf>  solve by enumeration (<= 24 vars); exit 10 SAT / 20 UNSAT
     \\  check <file.cnf> <model>  verify competition v-lines against the formula
     \\  version           print the version
@@ -25,6 +27,8 @@ main! = |args| {
     cmd = args.drop_first(1).map(OsStr.display)
     match cmd {
         ["parse", file] => parse!(file)
+        ["solve", file] => solve!(file, None)
+        ["solve", file, proof] => solve!(file, Some(proof))
         ["brute", file] => brute!(file)
         ["check", file, model] => check!(file, model)
         ["version"] => Stdout.line!("rocsat ${version}")
@@ -63,21 +67,42 @@ parse! = |file| {
     Stdout.line!("c vars=${cnf.num_vars.to_str()} clauses=${cnf.clauses.len().to_str()} lits=${lits.to_str()}")
 }
 
+solve! : Str, [Some(Str), None] => Try({}, _)
+solve! = |file, proof_path| {
+    cnf = read_cnf!(file)?
+    (st, result) = Solver.solve(Solver.from_cnf(cnf, proof_path != None))
+    Stdout.line!(Solver.stats(st))?
+    match proof_path {
+        Some(path) => Path.utf8(path).write_bytes!(st.proof.bytes)?
+        None => {}
+    }
+    match result {
+        Sat => report_sat!(Solver.model(st))
+        Unsat => report_unsat!({})
+    }
+}
+
+report_sat! : Model.Assignment => Try({}, _)
+report_sat! = |assign| {
+    Stdout.line!("s SATISFIABLE")?
+    for line in Model.format_v_lines(assign) {
+        Stdout.line!(line)?
+    }
+    Err(Exit(10))
+}
+
+report_unsat! : {} => Try({}, _)
+report_unsat! = |{}| {
+    Stdout.line!("s UNSATISFIABLE")?
+    Err(Exit(20))
+}
+
 brute! : Str => Try({}, _)
 brute! = |file| {
     cnf = read_cnf!(file)?
     match Brute.solve(cnf) {
-        Ok(Sat(assign)) => {
-            Stdout.line!("s SATISFIABLE")?
-            for line in Model.format_v_lines(assign) {
-                Stdout.line!(line)?
-            }
-            Err(Exit(10))
-        }
-        Ok(Unsat) => {
-            Stdout.line!("s UNSATISFIABLE")?
-            Err(Exit(20))
-        }
+        Ok(Sat(assign)) => report_sat!(assign)
+        Ok(Unsat) => report_unsat!({})
         Err(TooManyVars(n)) => {
             Stderr.line!("c error: ${n.to_str()} variables, brute force is capped at ${Brute.max_vars.to_str()}")?
             Err(Exit(1))

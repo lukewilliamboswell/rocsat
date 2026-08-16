@@ -5,13 +5,15 @@
 # ///
 """Random-CNF fuzz loop against a PySAT oracle.
 
-    bench/fuzz.py [--seconds 60] [--seed S] [--tiny] [--subcommand brute] [--max-vars 24]
-                  [--binary src/rocsat] [--dev-binary src/rocsat-dev]
+    bench/fuzz.py [--seconds 60] [--seed S] [--tiny] [--subcommand solve] [--max-vars 24]
+                  [--drat] [--binary src/rocsat] [--dev-binary src/rocsat-dev]
     bench/fuzz.py --check FILE          # predicate mode: exit 42 iff FILE shows a bug
 
 Each round generates a small CNF (own generator, alternating with cnfuzz when built), then:
 exit code must be 10/20 and match the oracle (PySAT CaDiCaL), SAT models must pass `<binary>
-check`, and the dev binary must give the same status without printing `Expect failed`. On the
+check`, UNSAT proofs must verify with drat-trim when `--drat` is given (the proof path is passed
+as an extra argument), and the dev binary must give the same status without printing `Expect
+failed`. On the
 first bug the instance is saved under bench/out/fail-<seed>.cnf, shrunk with cnfdd through
 bench/predicate.sh when available, and the script exits 1.
 """
@@ -25,29 +27,6 @@ import time
 import common
 
 BUG_EXIT = 42
-
-
-def parse_dimacs(data):
-    """Lenient enough for what the generators produce; returns (num_vars, clauses)."""
-    num_vars, clauses, cur = 0, [], []
-    for line in data.decode().splitlines():
-        if line.startswith("c"):
-            continue
-        toks = line.split()
-        if not toks:
-            continue
-        if toks[0] == "p":
-            num_vars = int(toks[2])
-            continue
-        for t in toks:
-            v = int(t)
-            if v == 0:
-                clauses.append(cur)
-                cur = []
-            else:
-                cur.append(v)
-                num_vars = max(num_vars, abs(v))
-    return num_vars, clauses
 
 
 def oracle_status(clauses):
@@ -94,7 +73,7 @@ def generate_cnfuzz(seed, tiny, max_vars):
         return None
     for attempt in range(50):
         rc, out, _, _ = common.run([cnfuzz] + (["--tiny"] if tiny else []) + [str(seed + attempt * 1_000_003)], 30)
-        if rc == 0 and out and parse_dimacs(out)[0] <= max_vars:
+        if rc == 0 and out and common.parse_cnf(out)[0] <= max_vars:
             return out
     return None
 
@@ -102,8 +81,9 @@ def generate_cnfuzz(seed, tiny, max_vars):
 def check_instance(path, args):
     """Reason string if the instance reveals a bug, else None."""
     data = open(path, "rb").read()
-    _, clauses = parse_dimacs(data)
-    rc, out, err, _ = common.run([args.binary, args.subcommand, path], args.timeout)
+    _, clauses = common.parse_cnf(data)
+    proof = path + ".drat" if args.drat else None
+    rc, out, err, _ = common.run([args.binary, args.subcommand, path] + ([proof] if proof else []), args.timeout)
     if rc is None:
         return "timeout"
     if rc not in (10, 20):
@@ -122,6 +102,10 @@ def check_instance(path, args):
             os.unlink(model)
         if rc2 != 0:
             return f"model rejected: {err2.decode(errors='replace').strip()}"
+    elif proof:
+        reason = common.check_proof(path, proof, args.timeout)
+        if reason:
+            return reason
     if args.dev_binary and os.access(args.dev_binary, os.X_OK):
         rc3, out3, err3, _ = common.run([args.dev_binary, args.subcommand, path], args.timeout * 10)
         if b"Expect failed" in out3 + err3:
@@ -135,12 +119,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--binary", default=os.path.join(common.ROOT, "src", "rocsat"))
     ap.add_argument("--dev-binary", default=os.path.join(common.ROOT, "src", "rocsat-dev"))
-    ap.add_argument("--subcommand", default="brute")
+    ap.add_argument("--subcommand", default="solve")
     ap.add_argument("--seconds", type=float, default=60)
     ap.add_argument("--seed", type=int, default=int(time.time()))
     ap.add_argument("--tiny", action="store_true", help="cnfuzz --tiny (also caps own generator lower)")
     ap.add_argument("--max-vars", type=int, default=24)
     ap.add_argument("--timeout", type=float, default=30)
+    ap.add_argument("--drat", action="store_true", help="verify UNSAT proofs with drat-trim")
     ap.add_argument("--check", metavar="FILE", help=f"predicate mode: exit {BUG_EXIT} iff FILE shows a bug")
     args = ap.parse_args()
 
@@ -170,6 +155,8 @@ def main():
         reason = check_instance(path, args)
         if reason is None:
             os.unlink(path)
+            if args.drat and os.path.isfile(path + ".drat"):
+                os.unlink(path + ".drat")
             continue
         fail = os.path.join(common.OUT, f"fail-{seed}.cnf")
         os.rename(path, fail)
@@ -179,7 +166,7 @@ def main():
             small = os.path.join(common.OUT, f"fail-{seed}-min.cnf")
             common.run([cnfdd, "-e", str(BUG_EXIT), fail, small, os.path.join(common.BENCH, "predicate.sh")], 600)
             if os.path.isfile(small):
-                print(f"  shrunk to {os.path.relpath(small, common.ROOT)} ({len(parse_dimacs(open(small, 'rb').read())[1])} clauses)")
+                print(f"  shrunk to {os.path.relpath(small, common.ROOT)} ({len(common.parse_cnf(open(small, 'rb').read())[1])} clauses)")
         sys.exit(1)
     print(f"fuzz: {rounds} instances clean in {args.seconds:g}s (seed {args.seed})")
 

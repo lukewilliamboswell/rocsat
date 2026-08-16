@@ -34,6 +34,32 @@ Brute :: [].{
 
     lit_is_false : Model.Assignment, U32 -> Bool
     lit_is_false = |assign, lit| Model.lit_is_true(assign, lit.bitwise_xor(1))
+
+    # Seeded random 3-CNF generator (Knuth's MMIX LCG), shared by the differential tests.
+    random_cnf : U64, U64, U64 -> Dimacs.Cnf
+    random_cnf = |seed, num_vars, num_clauses| {
+        var $rng = seed
+        var $clauses = []
+        var $c = 0
+        while $c < num_clauses {
+            var $clause = []
+            var $k = 0
+            while $k < 3 {
+                $rng = next_rng($rng)
+                $clause = $clause.append(rng_below($rng, 2 * num_vars).to_u32_wrap())
+                $k = $k + 1
+            }
+            $clauses = $clauses.append($clause)
+            $c = $c + 1
+        }
+        { num_vars, clauses: $clauses }
+    }
+
+    next_rng : U64 -> U64
+    next_rng = |x| x.times_wrap(6364136223846793005).plus_wrap(1442695040888963407)
+
+    rng_below : U64, U64 -> U64
+    rng_below = |x, n| x.shr_wrap(33) % n
 }
 
 expect Brute.solve({ num_vars: 0, clauses: [] }) == Ok(Sat([]))
@@ -45,35 +71,12 @@ expect Brute.solve({ num_vars: 2, clauses: [[0, 2], [0, 3], [1, 2], [1, 3]] }) =
 expect Brute.solve({ num_vars: 25, clauses: [] }) == Err(TooManyVars(25))
 expect Brute.solve({ num_vars: 2, clauses: [[3, 1]] }) == Ok(Sat([1, 2]))
 
-# Every SAT answer must pass the independent checker, on seeded random 3-CNFs.
-next_rng = |x| x.times_wrap(6364136223846793005).plus_wrap(1442695040888963407)
-rng_below = |x, n| x.shr_wrap(33) % n
-
-random_cnf : U64, U64, U64 -> Dimacs.Cnf
-random_cnf = |seed, num_vars, num_clauses| {
-    var $rng = seed
-    var $clauses = []
-    var $c = 0
-    while $c < num_clauses {
-        var $clause = []
-        var $k = 0
-        while $k < 3 {
-            $rng = next_rng($rng)
-            $clause = $clause.append(rng_below($rng, 2 * num_vars).to_u32_wrap())
-            $k = $k + 1
-        }
-        $clauses = $clauses.append($clause)
-        $c = $c + 1
-    }
-    { num_vars, clauses: $clauses }
-}
-
 expect {
     var $seed = 1
     var $ok = Bool.True
     var $sat = 0
     while $seed <= 200 {
-        cnf = random_cnf($seed, 8, 34)
+        cnf = Brute.random_cnf($seed, 8, 34)
         match Brute.solve(cnf) {
             Ok(Sat(a)) => {
                 $sat = $sat + 1
