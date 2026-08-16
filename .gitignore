@@ -11,3 +11,4 @@ bench/corpus/
 bench/tools/
 bench/out/
 *.drat
+__pycache__/

@@ -1,0 +1,13 @@
+# Fast regression set for bench/run.py: sets under bench/corpus (see bench/fetch.sh), `edge`
+# for tests/edge, `[:N]` keeps the first N instances. Solvers that cannot handle an instance
+# size are run with --max-vars so this list stays the same across milestones.
+edge
+uf20-91
+uf50-218[:300]
+uuf50-218[:300]
+uf100-430[:100]
+uuf100-430[:100]
+aim
+dubois
+pret
+hole

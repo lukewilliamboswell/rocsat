@@ -1,0 +1,8 @@
+p cnf 3 3
+c first
+1 2 0
+c middle
+-1 3 0
+c last
+-3 0
+c end
