@@ -51,4 +51,6 @@ loop, model). Hot code takes and returns lists, never the state record — the h
   `expected.py` (reference statuses in `bench/expected/`), `regression.txt`, `canary.sh`
 - `tests/edge/` — hand-written edge-case CNFs
 - `research/`, `roc-docs/`, `spike/` — background material, frozen
+- `upstream/` — verified reproducers for the compiler and toolchain problems this project hit,
+  one directory per issue, with a report in `upstream/README.md`; none filed yet
 - `plans/` — local planning documents; only `ROADMAP.md` is committed

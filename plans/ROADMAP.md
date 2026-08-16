@@ -36,9 +36,11 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 
 - [ ] Nightly suite: all SATLIB + 100–200 GBD-selected competition instances, PAR-2 deltas,
       1 h `runcnfuzz`, `hyperfine` min-of-N, RSS (after milestone 1)
-- [ ] Upstream reports: record-field-projection spurious incref, nominal-pattern segfault,
-      `roc test --opt=speed` link failure, nominal method dispatch cost, monotonic clock in
-      basic-cli (see `research/02-roc-performance.md` UNRESOLVED)
+- [~] Upstream reports: eight verified reproducers and a report in `upstream/` (record-field
+      projection clone, nominal-pattern compiler segfault, `roc test --opt=speed` link failure,
+      `--opt=interpreter` link failure, nested-list clone, `List.reserve` growth, helper not
+      inlined, stale `expect` doc). Nothing filed yet. Nominal method dispatch cost was
+      re-measured and withdrawn; the monotonic clock is a basic-cli request, still open.
 - [ ] Simplification passes when `plans/simplify-backlog.md` clusters around one area
 
 ## Log
@@ -46,3 +48,4 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 - 2026-08-16 — research complete; step-0 decisions taken; milestone 0 planned; ladder condensed to 0–4 + later list (library, not only CLI).
 - 2026-08-16 — milestone 0 done: parser (349 MB/s), model checker, brute reference, bench harness (run/expected/fuzz/canary), 31 edge CNFs, `make check` in ~34 s.
 - 2026-08-16 — milestone 1 done: `rocsat solve` (CDCL, 1-UIP, DRAT). uf100/uuf100 ≤ 0.14 s, hole10 71 ms; all UNSAT proofs verified; uf250/uuf250 do not finish in 7 min with the static decision order (milestone 2 re-measures). Compiler finding: only list-parameter/tuple-return functions and `var`-held lists stay in place on this nightly — record threading copies; shape rules in `src/Core.roc`.
+- 2026-08-16 — `upstream/`: eight compiler/toolchain/docs problems re-verified on the pinned nightly and reduced to self-contained reproducers, plus four earlier notes that did not reproduce and one (nominal dispatch cost) that was withdrawn. Not filed yet.

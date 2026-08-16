@@ -6,6 +6,13 @@ src/rocsat
 src/rocsat-dev
 .roc-cache/
 
+# binaries built by the upstream reproducers (each dir keeps only its .roc/.md/run.sh)
+upstream/01-record-field-clone/record_field_clone
+upstream/05-nested-list-clone/nested_list
+upstream/06-list-reserve-quadratic/reserve
+upstream/07-helper-not-inlined/inline_vs_call
+upstream/08-docs-expect-opt-speed/expect_cost
+
 # fetched corpora, external tools, run outputs
 bench/corpus/
 bench/tools/
