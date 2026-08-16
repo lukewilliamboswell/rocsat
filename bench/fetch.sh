@@ -8,7 +8,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 corpus="$here/corpus"
 base=https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT
 
-fetch() {
+fetch() (
     set=$1
     url=$2
     dir="$corpus/$set"
@@ -18,15 +18,19 @@ fetch() {
     fi
     echo "$set: fetching"
     tmp=$(mktemp -d)
-    curl -sSL -o "$tmp/a.tar.gz" "$url"
+    trap 'rm -rf "$tmp"' 0 1 2 3 15
+    curl -fLsS -o "$tmp/a.tar.gz" "$url"
     mkdir -p "$dir"
     tar xzf "$tmp/a.tar.gz" -C "$tmp"
     # some tarballs unpack flat, others into a subdirectory
     find "$tmp" -name '*.cnf' -exec mv {} "$dir/" \;
-    for f in "$dir"/*.cnf; do sed -i '' '/^%/,$d' "$f"; done
-    rm -rf "$tmp"
+    for f in "$dir"/*.cnf; do
+        clean="$f.clean.$$"
+        sed '/^%/,$d' "$f" > "$clean"
+        mv "$clean" "$f"
+    done
     echo "$set: $(ls "$dir" | wc -l | tr -d ' ') files"
-}
+)
 
 fetch uf20-91      $base/RND3SAT/uf20-91.tar.gz
 fetch uf50-218     $base/RND3SAT/uf50-218.tar.gz

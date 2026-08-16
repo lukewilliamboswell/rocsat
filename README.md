@@ -12,15 +12,18 @@ The compiler is pinned in `roc-version`; `scripts/roc` runs that exact nightly f
 tarball for your platform from `https://github.com/roc-lang/nightlies/releases/tag/<tag>` and
 extract it so that `~/.roc/<tag>/roc` exists.
 
-The harness also needs standard build tools plus CaDiCaL, drat-trim, cnfuzz, cnfdd, dimocheck,
-hyperfine, and `uv`; PySAT is a script dependency that `uv` fetches. The bootstrap scripts
-currently target macOS (`brew` and BSD `sed`):
+For the test harness, install `git`, `make`, `gcc`, `curl`, `tar`, and
+[`uv`](https://docs.astral.sh/uv/getting-started/installation/). On macOS, the Xcode command-line
+tools provide the build tools (`xcode-select --install`); on Debian/Ubuntu, install
+`build-essential git curl ca-certificates`. Then the same commands work on macOS and Linux:
 
-    bench/tools.sh     # installs packages and builds tools into bench/tools/
-    bench/fetch.sh     # downloads SATLIB into bench/corpus/
+    bench/tools.sh     # builds drat-trim, cnfuzz, cnfdd, and dimocheck into bench/tools/
+    bench/fetch.sh     # downloads and normalizes SATLIB into bench/corpus/
+    make check
 
-On other platforms, install or build the same tools and fetch the same corpora with the local
-platform's equivalents.
+PySAT is declared by `bench/fuzz.py` and fetched by `uv`. Install `hyperfine` for the timing
+canary (`make canary`). CaDiCaL is only required to regenerate the committed reference statuses
+with `bench/expected.py`; Kissat and MiniSat are optional comparison solvers.
 
 ## Building and checking
 
