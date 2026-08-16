@@ -41,3 +41,10 @@ Diff-level hygiene cannot prevent it: complexity accumulates in the seams no sin
 - Maintain `plans/simplify-backlog.md` as a living document. Every surprise, duplicated concept, bad abstraction, or "this fought me" moment becomes one line there. A flag without a destination evaporates at the next compaction.
 - Before starting a task, check the backlog for the area about to be touched. If clearing an entry first would make the task smaller or safer, propose doing it first: make the change easy, then make the easy change.
 - When entries cluster around one area, propose a dedicated simplification task with its own plan document. The largest reductions are redesigns unreachable by in-task steps — a data model that makes an error class unrepresentable, a boundary redrawn so three modules become one. These never happen unless they are scheduled as work.
+
+## Project conventions
+
+- Python: never `pip`. Scripts run under `uv run --script` and declare their dependencies in the
+  PEP 723 header; ad-hoc snippets use `uv run python`.
+- Roc multi-line strings use `\\` line prefixes (see `roc-docs/all_syntax_test.roc`), not
+  `Str.join_with`.

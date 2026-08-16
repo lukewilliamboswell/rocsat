@@ -11,10 +11,11 @@ The compiler is pinned in `roc-version`; `scripts/roc` runs that exact nightly f
 tarball for your platform from `https://github.com/roc-lang/nightlies/releases/tag/<tag>` and
 extract it so that `~/.roc/<tag>/roc` exists.
 
-External tools for the test harness (CaDiCaL as status oracle, PySAT, drat-trim, cnfuzz, cnfdd,
-dimocheck, hyperfine) and the SATLIB corpora are installed once:
+External tools for the test harness (CaDiCaL as status oracle, drat-trim, cnfuzz, cnfdd,
+dimocheck, hyperfine, `uv` for the Python scripts — PySAT is a script dependency `uv` fetches)
+and the SATLIB corpora are installed once:
 
-    bench/tools.sh     # brew + pip + builds into bench/tools/
+    bench/tools.sh     # brew + builds into bench/tools/
     bench/fetch.sh     # SATLIB into bench/corpus/
 
 ## Building and checking

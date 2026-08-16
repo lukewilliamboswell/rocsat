@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["python-sat"]
+# ///
 """Random-CNF fuzz loop against a PySAT oracle.
 
     bench/fuzz.py [--seconds 60] [--seed S] [--tiny] [--subcommand brute] [--max-vars 24]

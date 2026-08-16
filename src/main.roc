@@ -10,19 +10,15 @@ import Brute
 
 version = "0.0.0"
 
-usage = Str.join_with(
-    [
-        "usage: rocsat <command> [args]",
-        "",
-        "commands:",
-        "  parse <file.cnf>  read a DIMACS file and print its size",
-        "  brute <file.cnf>  solve by enumeration (<= 24 vars); exit 10 SAT / 20 UNSAT",
-        "  check <file.cnf> <model>  verify competition v-lines against the formula",
-        "  version           print the version",
-        "  help              print this message",
-    ],
-    "\n",
-)
+usage =
+    \\usage: rocsat <command> [args]
+    \\
+    \\commands:
+    \\  parse <file.cnf>  read a DIMACS file and print its size
+    \\  brute <file.cnf>  solve by enumeration (<= 24 vars); exit 10 SAT / 20 UNSAT
+    \\  check <file.cnf> <model>  verify competition v-lines against the formula
+    \\  version           print the version
+    \\  help              print this message
 
 main! : List(OsStr) => Try({}, _)
 main! = |args| {

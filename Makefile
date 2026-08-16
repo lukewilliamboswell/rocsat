@@ -14,10 +14,10 @@ test:
 	$(ROC) test src/main.roc
 
 regression: build
-	python3 bench/run.py src/rocsat $(SOLVER) bench/regression.txt --max-vars $(MAX_VARS)
+	uv run --script bench/run.py src/rocsat $(SOLVER) bench/regression.txt --max-vars $(MAX_VARS)
 
 fuzz: build build-dev
-	python3 bench/fuzz.py --subcommand $(SOLVER) --max-vars $(MAX_VARS) --seconds 30 --tiny
+	uv run --script bench/fuzz.py --subcommand $(SOLVER) --max-vars $(MAX_VARS) --seconds 30 --tiny
 
 canary: build
 	bench/canary.sh

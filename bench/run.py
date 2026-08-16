@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+# ///
 """Runs a rocsat subcommand over instance sets and checks every answer.
 
     bench/run.py <binary> <subcommand> <set|list.txt|glob>... [options]

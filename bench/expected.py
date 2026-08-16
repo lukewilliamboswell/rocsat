@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+# ///
 """Records reference statuses: runs CaDiCaL over instance sets and writes bench/expected/<set>.tsv.
 
     bench/expected.py [--jobs N] [--timeout S] [--force] [set ...]
