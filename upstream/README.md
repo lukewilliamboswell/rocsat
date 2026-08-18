@@ -13,8 +13,30 @@ Every timing MRE prints a checksum so the modes can be compared for equality, an
 sizes from `argv` so nothing is constant-folded at compile time.
 
 **Nothing here has been filed upstream yet.** Before filing, search roc-lang/roc for
-duplicates — several of these are the kind of thing that may already have an issue or may have
-been fixed on a later nightly, which we have not tested.
+duplicates.
+
+## Latest-nightly retest
+
+On 2026-08-18 we compared the original compiler with **`nightly-2026-08-18-e9be50a`** on the
+same Linux ARM64 host. The solver's 2 M-clause scaling canary was unchanged: 294.2 ns/clause on
+`nightly-2026-08-13-2fdd90e` and 292.1 ns/clause on the new nightly, both well below its 700 ns
+hard ceiling. The performance shapes that forced the solver's flat, list-threaded design also
+remain:
+
+| # | Latest-nightly result |
+|---|---|
+| [01](01-record-field-clone/) | Reproduced. At 8 000 writes, `call_qq` took 98.9 s while the three in-place shapes took 6.1–6.8 ms; the old nightly took 97.5 s and 5.9–6.5 ms on this host. |
+| [02](02-nominal-pattern-segfault/) | Reproduced: 10 compiler segfaults in 10 fresh, uncached checks. The corrected control checks cleanly. |
+| [03](03-roc-test-speed-link/) | macOS linker symptom not testable on Linux. Speed-backend tests pass on both nightlies when `TMPDIR` is executable; this host's default no-exec `/tmp` otherwise causes an unrelated `PermissionDenied`. |
+| [04](04-opt-interpreter-link/) | macOS linker symptom not testable on Linux, but the backend is still broken here too: both nightlies report a successful interpreter build and the resulting hello-world immediately segfaults. |
+| [05](05-nested-list-clone/) | Reproduced. At 3.2 M appends, nested `update` took 23.6 s and flat storage 5.1 ms (old nightly: 23.4 s and 4.7 ms), with the same superlinear scaling. |
+| [06](06-list-reserve-quadratic/) | Reproduced. At 4 M appends, repeated `reserve` took 3.00 s and plain append 10.4 ms (old nightly: 2.94 s and 10.4 ms), with the same quadratic scaling. |
+| [07](07-helper-not-inlined/) | Reproduced. The helper loops took 18–19 ms versus 4–6 ms inline, the same roughly fourfold gap as the old nightly. |
+| [08](08-docs-expect-opt-speed/) | Reproduced, and the contradictory note is still present at compiler commit `e9be50a` and on `main`: speed/size omit the condition while a small dev run remains quadratic. |
+
+Checksums matched across every mode in the timing reproducers. Issues 03 and 04 need a fresh
+macOS run before filing their original platform-specific symptoms; the other six reproduce on
+the latest nightly.
 
 ## Summary
 
