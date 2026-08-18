@@ -1,6 +1,6 @@
 # A list in a call-built record is copied on every mutation
 
-**Compilers:** `nightly-2026-08-13-2fdd90e` and `nightly-2026-08-18-e9be50a`, Linux ARM64,
+**Compiler:** `nightly-2026-08-18-e9be50a`, Linux ARM64,
 `roc build --opt=speed`.
 
 ## Minimal reproducer
@@ -13,6 +13,9 @@ main! = |args| {
     len = U64.from_str(args.get(0)?)?
     n = U64.from_str(args.get(1)?)?
 
+    # no copying
+    # var $s = { x: List.repeat(0.U64, len), y: 0 }
+    # copying
     var $s = new(len)
     var $i = 0
     while $i < n {
@@ -49,7 +52,6 @@ On `nightly-2026-08-18-e9be50a`, minimum wall times over three runs were:
 | 500,000 | 200 | 292 ms |
 
 Time scales with both list length and write count: each `set` copies the whole list.
-`nightly-2026-08-13-2fdd90e` produced the same scaling and nearly identical times.
 
 ## One-line control
 
