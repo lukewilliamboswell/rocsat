@@ -12,8 +12,9 @@ draft, plus the Roc files, plus (where the symptom is timing or flakiness) a way
 Every timing MRE prints a checksum so the modes can be compared for equality, and takes its
 sizes from `argv` so nothing is constant-folded at compile time.
 
-**Nothing here has been filed upstream yet.** Before filing, search roc-lang/roc for
-duplicates.
+Filed upstream: [01 as roc#10848](https://github.com/roc-lang/roc/issues/10848) and
+[02 as roc#10847](https://github.com/roc-lang/roc/issues/10847). Search for duplicates before
+filing the remaining reports.
 
 ## Latest-nightly retest
 
@@ -29,7 +30,7 @@ remain:
 | [02](02-nominal-pattern-segfault/) | Reproduced with both omitted and nonexistent nominal fields. The minimal app crashed in 20/20 uncached checks on both tested nightlies; its corrected pattern checks cleanly. |
 | [03](03-roc-test-speed-link/) | macOS linker symptom not testable on Linux. Speed-backend tests pass on both nightlies when `TMPDIR` is executable; this host's default no-exec `/tmp` otherwise causes an unrelated `PermissionDenied`. |
 | [04](04-opt-interpreter-link/) | macOS linker symptom not testable on Linux, but the backend is still broken here too: both nightlies report a successful interpreter build and the resulting hello-world immediately segfaults. |
-| [05](05-nested-list-clone/) | Reproduced. At 3.2 M appends, nested `update` took 23.6 s and flat storage 5.1 ms (old nightly: 23.4 s and 4.7 ms), with the same superlinear scaling. |
+| [05](05-nested-list-clone/) | Reproduced and reduced to one fixed-size inner list. With 1 M elements, 100/200/400 writes through `List.update` took 286/570/1,148 ms; the equivalent singleton-list rebuild took 1.5/1.8/2.1 ms. |
 | [06](06-list-reserve-quadratic/) | Reproduced. At 4 M appends, repeated `reserve` took 3.00 s and plain append 10.4 ms (old nightly: 2.94 s and 10.4 ms), with the same quadratic scaling. |
 | [07](07-helper-not-inlined/) | Reproduced. The helper loops took 18–19 ms versus 4–6 ms inline, the same roughly fourfold gap as the old nightly. |
 | [08](08-docs-expect-opt-speed/) | Reproduced, and the contradictory note is still present at compiler commit `e9be50a` and on `main`: speed/size omit the condition while a small dev run remains quadratic. |
@@ -46,13 +47,12 @@ the latest nightly.
 | [02](02-nominal-pattern-segfault/) | Compiler SIGSEGV when an app uses a function with an invalid nominal record pattern | Compiler crash | A type error terminates the compiler with no source location |
 | [03](03-roc-test-speed-link/) | `roc test --opt=speed` cannot link on macOS: `library not found for -lSystem` | Toolchain | No speed-backend unit tests |
 | [04](04-opt-interpreter-link/) | `--opt=interpreter` cannot produce a runnable hello-world (link failure on macOS, crashing output on Linux) | Toolchain | None; backend unusable |
-| [05](05-nested-list-clone/) | `List.update` / get+set on a `List(List(_))` clones the inner list every time | Quadratic builtin | Ruled out nested lists entirely |
+| [05](05-nested-list-clone/) | `List.update` increfs a nested element before its callback, so mutation copies the full inner list before replacing it | Quadratic builtin | Ruled out nested lists entirely |
 | [06](06-list-reserve-quadratic/) | `List.reserve(k)` sets capacity to exactly `len + k`, defeating geometric growth | Quadratic builtin | Trap avoided after measuring |
 | [07](07-helper-not-inlined/) | A four-line same-module helper is not inlined into a hot loop (~6.6 ns/call) | Missed optimisation | Hot loops written as one function |
 | [08](08-docs-expect-opt-speed/) | Mini-tutorial says `--opt=speed` does not discard `expect`s yet; it does | Docs | Wrong early design assumption |
 
-Filing order we would suggest: **02** (a crash, cheapest to act on), then **01** and **05**
-(both silent asymptotic traps with clear causes), then **06**, **03**, **08**, **07**, **04**.
+Suggested order for the remaining reports: **05**, then **06**, **03**, **08**, **07**, **04**.
 
 ## The two that shaped the project
 

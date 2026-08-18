@@ -1,23 +1,34 @@
 #!/bin/sh
-# Builds and times every mode, min of 3 runs. ROC=/path/to/roc if roc is not on PATH.
-# Expect update and getset to roughly quadruple per doubling of n; flat stays linear.
+# Builds the minimal reproducer and measures scaling in inner-list length and write count.
 set -eu
 roc=${ROC:-roc}
 cd "$(dirname "$0")"
-"$roc" build --opt=speed nested_list.roc
-python3 - <<'PY'
-import subprocess, time
+"$roc" build --opt=speed --output=app main.roc
+uv run python - <<'PY'
+import subprocess
+import time
 
-def t(args):
-    best = None
+points = (
+    (1_000_000, 100),
+    (1_000_000, 200),
+    (1_000_000, 400),
+    (250_000, 200),
+    (500_000, 200),
+)
+
+for length, writes in points:
+    samples = []
     for _ in range(3):
-        s = time.perf_counter()
-        subprocess.run(["./nested_list", *args], check=True, capture_output=True, timeout=300)
-        d = (time.perf_counter() - s) * 1000
-        best = d if best is None else min(best, d)
-    return best
-
-for mode in ("update", "getset", "flat"):
-    for n in (400000, 800000, 1600000, 3200000):
-        print(f"{mode:<7} n={n:<8} {t([mode, '1000', str(n)]):9.1f} ms")
+        start = time.perf_counter()
+        result = subprocess.run(
+            ["./app", str(length), str(writes)],
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+        samples.append((time.perf_counter() - start) * 1000)
+    print(
+        f"len={length:>7} writes={writes:>3} "
+        f"{min(samples):>8.1f} ms result={result.stdout.decode().strip()}"
+    )
 PY
