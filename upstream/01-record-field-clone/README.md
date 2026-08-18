@@ -1,22 +1,22 @@
-# A list in a call-built record is copied on every mutation
+# Equivalent record initializers produce a ~900× `List.set` performance difference
 
-**Compiler:** `nightly-2026-08-18-e9be50a`, Linux ARM64,
-`roc build --opt=speed`.
+Hi, I found this performance issue while working on my project.
+Roc compiler version nightly-2026-08-18-e9be50a, tested with `--opt=speed` on Linux ARM64.
+Here is the LLM-generated report for reproduction of the problem.
 
-## Minimal reproducer
+## Reproducer
 
-`main.roc` creates a two-field record through `new`, repeatedly changes one element of its list,
-and reads the result through a helper:
+Save this as `main.roc`:
 
 ```roc
 main! = |args| {
     len = U64.from_str(args.get(0)?)?
     n = U64.from_str(args.get(1)?)?
 
-    # no copying
+    # In-place control:
     # var $s = { x: List.repeat(0.U64, len), y: 0 }
-    # copying
     var $s = new(len)
+
     var $i = 0
     while $i < n {
         $s = { ..$s, x: $s.x.set(0, $i) ?? $s.x }
@@ -31,51 +31,38 @@ new = |n| { x: List.repeat(0.U64, n), y: 0 }
 read = |s| s.x.get(s.y) ?? 0
 ```
 
-Build it and vary the U64 list's length and the number of writes:
+Build and run it with a one-million-element list:
 
 ```sh
-roc build --opt=speed main.roc
+roc build --opt=speed --output=app main.roc
 
-./main 1000000 100
-./main 1000000 200
-./main 1000000 400
+time ./app 1000000 100
+time ./app 1000000 200
+time ./app 1000000 400
 ```
 
-On `nightly-2026-08-18-e9be50a`, minimum wall times over three runs were:
+Minimum wall times over three runs were:
 
-| list length | writes | time |
-|---:|---:|---:|
-| 1,000,000 | 100 | 296 ms |
-| 1,000,000 | 200 | 597 ms |
-| 1,000,000 | 400 | 1,185 ms |
-| 250,000 | 200 | 146 ms |
-| 500,000 | 200 | 292 ms |
+| initializer | 100 writes | 200 writes | 400 writes |
+|---|---:|---:|---:|
+| `new(len)` | 296 ms | 597 ms | 1,185 ms |
+| equivalent record literal | 1.3 ms | 1.3 ms | 1.3 ms |
 
-Time scales with both list length and write count: each `set` copies the whole list.
+To run the control, swap the two initializer lines in the source and rebuild. Both versions print the same results. With 200 writes, increasing the list length from 250,000 to 500,000 to 1,000,000 increases the call-built time from 146 ms to 292 ms to 597 ms. The cost therefore scales with both list length and write count.
 
-## One-line control
+## Generated-code difference
 
-Change only the initializer:
+Both builds retain `list_set` inside the runtime loop, so the fast version is not precomputed. The call-built loop increfs the list and selects the non-unique update path on every iteration:
 
-```roc
-# copies on every set
-var $s = new(len)
-
-# stays in place
-var $s = { x: List.repeat(0.U64, len), y: 0 }
+```llvm
+call void @roc_llvm_rc_incref_35_single_thread(...)
+call void @roc_builtins_list_set(..., i8 0, ...)
 ```
 
-After rebuilding, the literal version takes about 1.3 ms at all three write counts and prints the
-same results (`99`, `199`, and `399`). Constructing the same uniquely owned record through a
-function call changes this loop from effectively linear to quadratic work.
+The incref wrapper calls `roc_builtins_list_incref_single_thread`. The literal-built hot path has no corresponding incref and selects the unique update path:
 
-The minimum shape needs two record fields and the `read($s)` helper after the loop. A one-field
-record, or reading the final list directly instead of passing the record to `read`, stays in
-place. Those details should not change whether the uniquely owned list can be mutated in place.
+```llvm
+call void @roc_builtins_list_set(..., i8 1, ...)
+```
 
-## Files
-
-| file | what |
-|---|---|
-| `main.roc` | minimal reproducer |
-| `run.sh` | builds it and measures both scaling dimensions |
+This matches the observed full-list copy per `set`. I expected constructing the same uniquely owned record through a function call not to change the mutation loop's asymptotic cost.
