@@ -1,6 +1,8 @@
-# A three-line helper makes a loop about seven times slower
+# A two-line helper makes a loop about seven times slower
 
-Hi, I found this performance issue while working on my project.
+I found this performance characteristics a bit surprising. I’m not sure how much control does Roc have on inlining behavior, but keeping the following 2-line step helper makes the hot while loop 7x slower. I thought I’d report it in case that’s somethin you want to dive in.
+
+Below is the LLM report to help reproduce this perf issue.
 
 **Compiler:** `nightly-2026-08-18-e9be50a`, Linux ARM64, `roc build --opt=speed`.
 
@@ -63,6 +65,6 @@ Both versions print the same result. The helper version costs about 3.2 ns more 
 
 ## What seems to happen
 
-The final object file still contains a call from the loop to a separate 464-byte function for `step`. Writing the same code in the loop removes that call. A smaller helper containing only one `List.set` is inlined, but adding the second `List.set` is enough to keep this three-line source helper as a separate function.
+The final object file still contains a call from the loop to a separate 464-byte function for `step`. Writing the same code in the loop removes that call. A smaller helper containing only one `List.set` is inlined, but adding the second `List.set` is enough to keep this two-line source helper as a separate function.
 
 I expected a speed build to inline this small helper, which is called from one place, or otherwise produce code close to the version with the body written directly in the loop.
