@@ -13,8 +13,9 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` not started
 - [x] Track A — CDCL algorithms and milestone ladder (`research/01-cdcl-algorithms.md`)
 - [x] Track B — Roc performance and module structure (`research/02-roc-performance.md`)
 - [x] Track C — testing and benchmarking method (`research/03-testing-benchmarking.md`)
-- [x] Fixed decisions (2026-08-16): basic-cli 0.22.0 on nightly 2026-08-13-2fdd90e; `U32`
-      literals `2v+sign`; `List(U32)` clause arena; `src/` + `bench/` + `tests/` layout
+- [x] Fixed decisions (2026-08-16): basic-cli 0.22.0; `U32` literals `2v+sign`; `List(U32)`
+      clause arena; `src/` + `bench/` + `tests/` layout. The compiler is now pinned to
+      `nightly-2026-08-18-e9be50a` after a same-host canary and reproducer comparison.
 
 ## Phase 1 — solver milestones
 
@@ -36,16 +37,32 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 
 - [ ] Nightly suite: all SATLIB + 100–200 GBD-selected competition instances, PAR-2 deltas,
       1 h `runcnfuzz`, `hyperfine` min-of-N, RSS (after milestone 1)
-- [~] Upstream reports: eight verified reproducers and a report in `upstream/` (record-field
-      projection clone, nominal-pattern compiler segfault, `roc test --opt=speed` link failure,
-      `--opt=interpreter` backend failure, nested-list clone, `List.reserve` growth, helper not
-      inlined, stale `expect` doc). Nothing filed yet. Nominal method dispatch cost was
-      re-measured and withdrawn; the monotonic clock is a basic-cli request, still open.
+- [~] Upstream reports: eight verified reproducers and filing drafts in `upstream/`. Issues 01,
+      02, and 05 were filed as roc#10848, roc#10847, and roc#10849. Issue 07 is ready for review;
+      03, 06, and 08 await Roc forum feedback; 04 needs a current macOS run. Nominal method
+      dispatch cost was re-measured and withdrawn; the monotonic clock is a basic-cli request.
 - [ ] Simplification passes when `plans/simplify-backlog.md` clusters around one area
+
+## Current handoff (2026-08-18)
+
+- The pinned compiler is `nightly-2026-08-18-e9be50a`. Its final solver canary measured 286.2
+  ns/clause against the 700 ns ceiling; the old and new nightlies were effectively unchanged on
+  the same Linux ARM64 host. Keep the list-threaded hot APIs until issue roc#10848 is fixed and a
+  canary confirms that record threading is safe.
+- The next solver increment is milestone 2: add a VSIDS heap, phase saving, and Luby restarts,
+  then remeasure uf250/uuf250, which are the known misses under the static decision order. Check
+  `plans/simplify-backlog.md` before changing `Core`; in particular, watch-pool first allocation
+  and stale workaround comments overlap that area.
+- The next upstream action is to review and file issue 07, then record its URL in
+  `upstream/README.md`. Do not file 03 or 04 without a current macOS check, and leave 03, 06, and
+  08 paused until their forum discussions resolve.
+- `make check` is the commit gate; the latest run passed 276 Roc tests and 1,930 proof-checked
+  regressions plus a 30-second fuzz run. Run `make canary` for changes to hot storage or APIs.
 
 ## Log
 
 - 2026-08-16 — research complete; step-0 decisions taken; milestone 0 planned; ladder condensed to 0–4 + later list (library, not only CLI).
 - 2026-08-16 — milestone 0 done: parser (349 MB/s), model checker, brute reference, bench harness (run/expected/fuzz/canary), 31 edge CNFs, `make check` in ~34 s.
 - 2026-08-16 — milestone 1 done: `rocsat solve` (CDCL, 1-UIP, DRAT). uf100/uuf100 ≤ 0.14 s, hole10 71 ms; all UNSAT proofs verified; uf250/uuf250 do not finish in 7 min with the static decision order (milestone 2 re-measures). Compiler finding: only list-parameter/tuple-return functions and `var`-held lists stay in place on this nightly — record threading copies; shape rules in `src/Core.roc`.
-- 2026-08-16 — `upstream/`: eight compiler/toolchain/docs problems re-verified on the pinned nightly and reduced to self-contained reproducers, plus four earlier notes that did not reproduce and one (nominal dispatch cost) that was withdrawn. Not filed yet.
+- 2026-08-16 — `upstream/`: eight compiler/toolchain/docs problems re-verified on the pinned nightly and reduced to self-contained reproducers, plus four earlier notes that did not reproduce and one (nominal dispatch cost) that was withdrawn.
+- 2026-08-18 — updated to `nightly-2026-08-18-e9be50a` after same-host validation; minimized issues 01, 02, 05, 06, and 07; filed 01, 02, and 05 as roc#10848, roc#10847, and roc#10849.

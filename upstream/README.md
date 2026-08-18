@@ -30,7 +30,7 @@ remain:
 | [04](04-opt-interpreter-link/) | macOS linker symptom not testable on Linux, but the backend is still broken here too: both nightlies report a successful interpreter build and the resulting hello-world immediately segfaults. |
 | [05](05-nested-list-clone/) | Reproduced and reduced to one fixed-size inner list. With 1 M elements, 100/200/400 writes through `List.update` took 286/570/1,148 ms; the equivalent singleton-list rebuild took 1.5/1.8/2.1 ms. |
 | [06](06-list-reserve-quadratic/) | Reproduced and reduced to one 225-byte loop. At 10k/20k/40k/80k elements, reserving two slots before two appends took 152/588/2,322/9,307 ms; removing only the `reserve` line took 0.35/0.48/0.79/1.30 ms. |
-| [07](07-helper-not-inlined/) | Reproduced and reduced to one two-item list and a three-line helper. At 20 M/40 M/80 M iterations, the helper took 75/151/301 ms; writing the same two changes directly in the loop took 10/20/40 ms. |
+| [07](07-helper-not-inlined/) | Reproduced and reduced to one two-item list and a two-line helper body. At 20 M/40 M/80 M iterations, the helper took 75/151/301 ms; writing the same two changes directly in the loop took 10/20/40 ms. |
 | [08](08-docs-expect-opt-speed/) | Reproduced, and the contradictory note is still present at compiler commit `e9be50a` and on `main`: speed/size omit the condition while a small dev run remains quadratic. |
 
 Checksums matched across every mode in the timing reproducers. Issues 03 and 04 need a fresh
@@ -47,7 +47,7 @@ the latest nightly.
 | [04](04-opt-interpreter-link/) | `--opt=interpreter` cannot produce a runnable hello-world (link failure on macOS, crashing output on Linux) | Toolchain | None; backend unusable |
 | [05](05-nested-list-clone/) | `List.update` increfs a nested element before its callback, so mutation copies the full inner list before replacing it | Quadratic builtin | Ruled out nested lists entirely |
 | [06](06-list-reserve-quadratic/) | Repeatedly reserving a fixed-size chunk copies the growing list each time, while plain append grows geometrically | Quadratic builtin | Trap avoided after measuring |
-| [07](07-helper-not-inlined/) | A three-line, one-use helper with two `List.set` calls remains a function call and makes the loop about seven times slower | Missed optimisation | Hot loops written as one function |
+| [07](07-helper-not-inlined/) | A two-line, one-use helper body with two `List.set` calls remains a function call and makes the loop about seven times slower | Missed optimisation | Hot loops written as one function |
 | [08](08-docs-expect-opt-speed/) | Mini-tutorial says `--opt=speed` does not discard `expect`s yet; it does | Docs | Wrong early design assumption |
 
 Issue **07** is the next report to prepare. Issue **04** still needs a current macOS run; issues **03**, **06**, and **08** are paused for forum feedback.
