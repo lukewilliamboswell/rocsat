@@ -1,10 +1,12 @@
-# `List.update` copies a nested list on every mutation
+# `List.update` copies an inner list on every change
+
+Hi, I found this performance issue while working on my project.
 
 **Compiler:** `nightly-2026-08-18-e9be50a`, Linux ARM64, `roc build --opt=speed`.
 
-## Minimal reproducer
+## Example
 
-The outer list has one fixed-size inner list. Nothing grows; the loop only changes element 0:
+This program creates an outer list containing one fixed-size inner list. The loop only changes the first item, so no list grows.
 
 ```roc
 main! = |args| {
@@ -24,6 +26,8 @@ main! = |args| {
 }
 ```
 
+Build and run it:
+
 ```sh
 roc build --opt=speed --output=app main.roc
 
@@ -32,9 +36,9 @@ time ./app 1000000 200
 time ./app 1000000 400
 ```
 
-Minimum wall times over three runs:
+These are the fastest times from three runs:
 
-| inner length | writes | `List.update` |
+| inner list length | changes | time |
 |---:|---:|---:|
 | 1,000,000 | 100 | 286 ms |
 | 1,000,000 | 200 | 570 ms |
@@ -42,24 +46,22 @@ Minimum wall times over three runs:
 | 250,000 | 200 | 142 ms |
 | 500,000 | 200 | 302 ms |
 
-The cost scales with inner-list length × writes, even though every write targets the same element.
+The time grows with both the inner list length and the number of changes, even though every change writes to the same item.
 
-## Equivalent control
+## Faster equivalent version
 
-For this one-element outer list, replace the update with:
+Because this outer list contains only one item, the loop can instead get the inner list and rebuild the outer list:
 
 ```roc
 inner = $outer.get(0)?
 $outer = [inner.set(0, $i) ?? inner]
 ```
 
-The control produces the same results but takes 1.5, 1.8, and 2.1 ms for 100, 200, and 400
-writes. It keeps the inner list unique and mutates it in place.
+This produces the same results, but takes 1.5, 1.8, and 2.1 ms for 100, 200, and 400 changes. Roc updates the inner list in place in this version.
 
-## Generated-code difference
+## Why it appears to copy
 
-The `List.update` path extracts the inner list while the outer list still owns it, increfs it,
-and then invokes the callback:
+In the generated code for `List.update`, Roc increases the inner list's reference count while the outer list still points to it. `List.set` therefore sees a shared list and copies it. `List.update` then immediately replaces the old inner list, so the copy cannot be observed by the program.
 
 ```llvm
 call void @roc_llvm_rc_incref_35_single_thread(...)
@@ -68,11 +70,4 @@ call void @roc_builtins_list_set(..., i8 0, ...)
 call void @roc_builtins_list_replace(...)
 ```
 
-The incref wrapper calls `roc_builtins_list_incref_single_thread`, so `list_set` receives a
-shared inner list and copies it. Replacing the old inner list immediately afterward makes that
-copy unobservable.
-
-This appears distinct from [#10848](https://github.com/roc-lang/roc/issues/10848): this example
-has no record, constructor helper, or record-field projection. Here the extra reference is
-introduced while `List.update` passes a nested element to its callback. Both issues ultimately
-lose uniqueness, but through different source and generated-code paths.
+This looks separate from [#10848](https://github.com/roc-lang/roc/issues/10848). That issue needs a record built by a function call, while this example has no record and the extra reference appears inside `List.update`. Both problems cause an unnecessary list copy, but they reach it in different ways.
