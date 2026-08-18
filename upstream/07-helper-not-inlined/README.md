@@ -1,6 +1,9 @@
 # A small same-module helper is not inlined into a hot loop (~6.6 ns per call)
 
-**Compiler:** `nightly-2026-08-13-2fdd90e`, `roc build --opt=speed`, arm64 macOS.
+**Originally verified:** `nightly-2026-08-13-2fdd90e`, `roc build --opt=speed`, arm64 macOS.
+
+**Latest nightly:** still reproduces on `nightly-2026-08-18-e9be50a`, Linux ARM64. The helper
+loops took 18–19 ms versus 4–6 ms inline, retaining the roughly fourfold gap.
 
 ## Problem
 

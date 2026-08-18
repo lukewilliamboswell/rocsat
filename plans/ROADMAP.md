@@ -38,7 +38,7 @@ the first place clauses get deleted. The end product is a library with a CLI fro
       1 h `runcnfuzz`, `hyperfine` min-of-N, RSS (after milestone 1)
 - [~] Upstream reports: eight verified reproducers and a report in `upstream/` (record-field
       projection clone, nominal-pattern compiler segfault, `roc test --opt=speed` link failure,
-      `--opt=interpreter` link failure, nested-list clone, `List.reserve` growth, helper not
+      `--opt=interpreter` backend failure, nested-list clone, `List.reserve` growth, helper not
       inlined, stale `expect` doc). Nothing filed yet. Nominal method dispatch cost was
       re-measured and withdrawn; the monotonic clock is a basic-cli request, still open.
 - [ ] Simplification passes when `plans/simplify-backlog.md` clusters around one area

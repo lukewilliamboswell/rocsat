@@ -1,6 +1,11 @@
 # In-place list mutation through a record field depends on how the record was built
 
-**Compiler:** `nightly-2026-08-13-2fdd90e`, `roc build --opt=speed`, arm64 macOS (Darwin 24.6.0).
+**Originally verified:** `nightly-2026-08-13-2fdd90e`, `roc build --opt=speed`, arm64 macOS
+(Darwin 24.6.0).
+
+**Latest nightly:** still reproduces on `nightly-2026-08-18-e9be50a`, Linux ARM64. At 8 000
+writes, `call_qq` took 98.9 s while the in-place modes took 6.1–6.8 ms; the old nightly gave the
+same 97.5 s cliff on that host.
 
 ## Problem
 

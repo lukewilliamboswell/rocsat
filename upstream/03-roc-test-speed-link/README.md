@@ -1,7 +1,11 @@
 # `roc test --opt=speed` cannot link on macOS: `library not found for -lSystem`
 
-**Compiler:** `nightly-2026-08-13-2fdd90e`, arm64 macOS (Darwin 24.6.0), Xcode command-line
-tools installed (`roc build --opt=speed` links fine on the same machine).
+**Originally verified:** `nightly-2026-08-13-2fdd90e`, arm64 macOS (Darwin 24.6.0), Xcode
+command-line tools installed (`roc build --opt=speed` links fine on the same machine).
+
+**Latest-nightly status:** requires a fresh macOS run before filing. On Linux ARM64,
+`nightly-2026-08-18-e9be50a` passes the speed-backend test, so that platform cannot confirm or
+falsify the macOS linker failure.
 
 ## Problem
 

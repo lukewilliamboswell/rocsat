@@ -13,7 +13,7 @@ def t(args):
     best = None
     for _ in range(3):
         s = time.perf_counter()
-        subprocess.run(["./inline_vs_call", *args], capture_output=True, timeout=300)
+        subprocess.run(["./inline_vs_call", *args], check=True, capture_output=True, timeout=300)
         d = (time.perf_counter() - s) * 1000
         best = d if best is None else min(best, d)
     return best

@@ -1,6 +1,10 @@
 # Compiler SIGSEGV on a mismatched nominal record pattern in an imported module
 
-**Compiler:** `nightly-2026-08-13-2fdd90e`, arm64 macOS (Darwin 24.6.0).
+**Originally verified:** `nightly-2026-08-13-2fdd90e`, arm64 macOS (Darwin 24.6.0).
+
+**Latest nightly:** still reproduces on `nightly-2026-08-18-e9be50a`, Linux ARM64: 10 compiler
+segfaults in 10 fresh, uncached checks. Replacing `Sol.roc` with the corrected `ok.roc` checks
+cleanly.
 
 ## Problem
 

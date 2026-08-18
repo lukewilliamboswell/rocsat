@@ -45,7 +45,7 @@ the latest nightly.
 | [01](01-record-field-clone/) | Mutating a `List` through a record field clones it or not depending on whether the record came from a literal or a call, and on `?` vs `??` | Silent perf cliff: 0.96 ms per list write | Reshaped the entire solver API |
 | [02](02-nominal-pattern-segfault/) | Compiler SIGSEGV (8–10 runs in 10) on a mismatched nominal record pattern, when the module is imported | Compiler crash | Crash with no location, from a file that checks clean alone |
 | [03](03-roc-test-speed-link/) | `roc test --opt=speed` cannot link on macOS: `library not found for -lSystem` | Toolchain | No speed-backend unit tests |
-| [04](04-opt-interpreter-link/) | `roc build --opt=interpreter` cannot link: `undefined symbol: _main` | Toolchain | None; backend unusable |
+| [04](04-opt-interpreter-link/) | `--opt=interpreter` cannot produce a runnable hello-world (link failure on macOS, crashing output on Linux) | Toolchain | None; backend unusable |
 | [05](05-nested-list-clone/) | `List.update` / get+set on a `List(List(_))` clones the inner list every time | Quadratic builtin | Ruled out nested lists entirely |
 | [06](06-list-reserve-quadratic/) | `List.reserve(k)` sets capacity to exactly `len + k`, defeating geometric growth | Quadratic builtin | Trap avoided after measuring |
 | [07](07-helper-not-inlined/) | A four-line same-module helper is not inlined into a hot loop (~6.6 ns/call) | Missed optimisation | Hot loops written as one function |
@@ -132,7 +132,7 @@ Not bugs; listed because they came up and someone will wonder.
 ## Reproducing any of this
 
 ```sh
-roc version     # must print nightly-2026-08-13-2fdd90e
+roc version     # must print nightly-2026-08-18-e9be50a
 cd upstream/<dir>
 cat README.md   # exact commands and the numbers we measured
 ```

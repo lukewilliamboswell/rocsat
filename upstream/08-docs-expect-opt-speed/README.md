@@ -1,6 +1,10 @@
 # Docs: the mini-tutorial says `--opt=speed` does not discard `expect`s yet — it does
 
-**Compiler:** `nightly-2026-08-13-2fdd90e`, arm64 macOS.
+**Originally verified:** `nightly-2026-08-13-2fdd90e`, arm64 macOS.
+
+**Latest nightly:** still reproduces on `nightly-2026-08-18-e9be50a`, Linux ARM64. The note is
+still present at compiler commit `e9be50a` and on `main`; speed and size omit the condition,
+while a dev build remains quadratic.
 
 ## Problem
 

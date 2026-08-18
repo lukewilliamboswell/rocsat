@@ -1,6 +1,10 @@
 # Appending to an inner list of a `List(List(_))` clones it every time
 
-**Compiler:** `nightly-2026-08-13-2fdd90e`, `roc build --opt=speed`, arm64 macOS.
+**Originally verified:** `nightly-2026-08-13-2fdd90e`, `roc build --opt=speed`, arm64 macOS.
+
+**Latest nightly:** still reproduces on `nightly-2026-08-18-e9be50a`, Linux ARM64. At 3.2 M
+appends, `update` took 23.6 s and flat storage 5.1 ms, with the same superlinear scaling as the
+old nightly.
 
 ## Problem
 
