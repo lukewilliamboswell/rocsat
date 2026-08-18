@@ -1,23 +1,34 @@
 #!/bin/sh
-# Builds and times every mode, min of 3 runs. ROC=/path/to/roc if roc is not on PATH.
-# Expect call_qq to be ~1000x the others and to grow linearly with n.
+# Builds the minimal reproducer and measures scaling in list length and write count.
 set -eu
 roc=${ROC:-roc}
 cd "$(dirname "$0")"
-"$roc" build --opt=speed record_field_clone.roc
-python3 - <<'PY'
-import subprocess, time
+"$roc" build --opt=speed --output=app main.roc
+uv run python - <<'PY'
+import subprocess
+import time
 
-def t(args):
-    best = None
+points = (
+    (1_000_000, 100),
+    (1_000_000, 200),
+    (1_000_000, 400),
+    (250_000, 200),
+    (500_000, 200),
+)
+
+for length, writes in points:
+    samples = []
     for _ in range(3):
-        s = time.perf_counter()
-        subprocess.run(["./record_field_clone", *args], check=True, capture_output=True, timeout=300)
-        d = (time.perf_counter() - s) * 1000
-        best = d if best is None else min(best, d)
-    return best
-
-for mode in ("literal_qq", "call_qq", "call_q", "lists"):
-    for n in (2000, 4000, 8000):
-        print(f"{mode:<11} n={n:<6} {t([mode, '1000', '4000', str(n)]):8.1f} ms")
+        start = time.perf_counter()
+        result = subprocess.run(
+            ["./app", str(length), str(writes)],
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+        samples.append((time.perf_counter() - start) * 1000)
+    print(
+        f"len={length:>7} writes={writes:>3} "
+        f"{min(samples):>8.1f} ms result={result.stdout.decode().strip()}"
+    )
 PY

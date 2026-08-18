@@ -25,7 +25,7 @@ remain:
 
 | # | Latest-nightly result |
 |---|---|
-| [01](01-record-field-clone/) | Reproduced. At 8 000 writes, `call_qq` took 98.9 s while the three in-place shapes took 6.1–6.8 ms; the old nightly took 97.5 s and 5.9–6.5 ms on this host. |
+| [01](01-record-field-clone/) | Reproduced and reduced to one list, one scalar, and one loop. With a 1 M-element list, 100/200/400 writes through a call-built record took 296/597/1,185 ms; the equivalent literal-built record stayed near 1.3 ms. |
 | [02](02-nominal-pattern-segfault/) | Reproduced with both omitted and nonexistent nominal fields. The minimal app crashed in 20/20 uncached checks on both tested nightlies; its corrected pattern checks cleanly. |
 | [03](03-roc-test-speed-link/) | macOS linker symptom not testable on Linux. Speed-backend tests pass on both nightlies when `TMPDIR` is executable; this host's default no-exec `/tmp` otherwise causes an unrelated `PermissionDenied`. |
 | [04](04-opt-interpreter-link/) | macOS linker symptom not testable on Linux, but the backend is still broken here too: both nightlies report a successful interpreter build and the resulting hello-world immediately segfaults. |
@@ -42,7 +42,7 @@ the latest nightly.
 
 | # | Problem | Kind | Impact on us |
 |---|---|---|---|
-| [01](01-record-field-clone/) | Mutating a `List` through a record field clones it or not depending on whether the record came from a literal or a call, and on `?` vs `??` | Silent perf cliff: 0.96 ms per list write | Reshaped the entire solver API |
+| [01](01-record-field-clone/) | A list field is copied on every `set` when a two-field record is built by a call and later consumed by a helper; the equivalent literal stays in place | Silent quadratic work | Reshaped the entire solver API |
 | [02](02-nominal-pattern-segfault/) | Compiler SIGSEGV when an app uses a function with an invalid nominal record pattern | Compiler crash | A type error terminates the compiler with no source location |
 | [03](03-roc-test-speed-link/) | `roc test --opt=speed` cannot link on macOS: `library not found for -lSystem` | Toolchain | No speed-backend unit tests |
 | [04](04-opt-interpreter-link/) | `--opt=interpreter` cannot produce a runnable hello-world (link failure on macOS, crashing output on Linux) | Toolchain | None; backend unusable |

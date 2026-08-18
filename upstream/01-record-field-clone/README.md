@@ -1,101 +1,79 @@
-# In-place list mutation through a record field depends on how the record was built
+# A list in a call-built record is copied on every mutation
 
-**Originally verified:** `nightly-2026-08-13-2fdd90e`, `roc build --opt=speed`, arm64 macOS
-(Darwin 24.6.0).
+**Compilers:** `nightly-2026-08-13-2fdd90e` and `nightly-2026-08-18-e9be50a`, Linux ARM64,
+`roc build --opt=speed`.
 
-**Latest nightly:** still reproduces on `nightly-2026-08-18-e9be50a`, Linux ARM64. At 8 000
-writes, `call_qq` took 98.9 s while the in-place modes took 6.1–6.8 ms; the old nightly gave the
-same 97.5 s cliff on that host.
+## Minimal reproducer
 
-## Problem
+`main.roc` creates a two-field record through `new`, repeatedly changes one element of its list,
+and reads the result through a helper:
 
-Mutating a `List` held in a record field — `{ ..st, blocks: st.blocks.set(i, v) ... }` — is
-sometimes done in place and sometimes clones the whole list, once per operation. Which one you
-get depends on details that carry no semantic weight:
+```roc
+main! = |args| {
+    len = U64.from_str(args.get(0)?)?
+    n = U64.from_str(args.get(1)?)?
 
-- whether the record was produced by a **record literal** or by a **function call**, and
-- whether the failure of `set` is handled with **`?`** or with **`??`**.
+    var $s = new(len)
+    var $i = 0
+    while $i < n {
+        $s = { ..$s, x: $s.x.set(0, $i) ?? $s.x }
+        $i = $i + 1
+    }
 
-The four loops in `record_field_clone.roc` do identical work — `n` writes into a 32 MB
-`List(U64)` and a small counter list, both fields of the same two-field record — and print
-identical checksums. One of them is ~900× slower at n = 8 000, and its cost grows with `n`.
+    echo!(read($s).to_str())
+    Ok({})
+}
 
-## Reproduce
+new = |n| { x: List.repeat(0.U64, n), y: 0 }
+read = |s| s.x.get(s.y) ?? 0
+```
+
+Build it and vary the U64 list's length and the number of writes:
 
 ```sh
-roc build --opt=speed record_field_clone.roc
-for m in literal_qq call_qq call_q lists; do
-    for n in 2000 4000 8000; do
-        /usr/bin/time -p ./record_field_clone $m 1000 4000 $n
-    done
-done
+roc build --opt=speed main.roc
+
+./main 1000000 100
+./main 1000000 200
+./main 1000000 400
 ```
 
-| mode | record built by | `set` error | n = 2 000 | n = 4 000 | n = 8 000 |
-|---|---|---|---|---|---|
-| `literal_qq` | record literal | `??` | 7.7 ms | 7.7 ms | 7.7 ms |
-| `call_qq` | `new_state(m, cap)` | `??` | **1 934 ms** | **3 860 ms** | **7 701 ms** |
-| `call_q` | `new_state(m, cap)` | `?` | 9.4 ms | 9.8 ms | 8.9 ms |
-| `lists` | two separate values | `??` | 11.5 ms | 10.5 ms | 10.6 ms |
+On `nightly-2026-08-18-e9be50a`, minimum wall times over three runs were:
 
-`call_qq` costs 0.96 ms per iteration and is linear in `n`: that is one full copy of the 32 MB
-list per `set`. Peak RSS is exactly 2× — a transient second reference, not a leak.
+| list length | writes | time |
+|---:|---:|---:|
+| 1,000,000 | 100 | 296 ms |
+| 1,000,000 | 200 | 597 ms |
+| 1,000,000 | 400 | 1,185 ms |
+| 250,000 | 200 | 146 ms |
+| 500,000 | 200 | 292 ms |
 
-## Cause, from the generated IR
+Time scales with both list length and write count: each `set` copies the whole list.
+`nightly-2026-08-13-2fdd90e` produced the same scaling and nearly identical times.
 
-`roc build --opt=speed --keep-temp` leaves the pre-LLVM-opt bitcode; `llvm-dis` on it shows the
-difference at the `list_set` call sites of the very same source file.
+## One-line control
 
-Cloning path (`call_qq`):
+Change only the initializer:
 
-```llvm
-call void @roc_llvm_rc_incref_34_single_thread(ptr %10, i64 1, ptr null)
-...
-call void @roc_builtins_list_set(ptr %292, ptr %1104, i64 %1106, i64 %1108, i32 8,
-                                 i64 %1109, ptr %289, i64 8, i1 false,
-                                 ptr null, ptr null, i8 0, ptr null)
+```roc
+# copies on every set
+var $s = new(len)
+
+# stays in place
+var $s = { x: List.repeat(0.U64, len), y: 0 }
 ```
 
-In-place path (same file, another mode):
+After rebuilding, the literal version takes about 1.3 ms at all three write counts and prints the
+same results (`99`, `199`, and `399`). Constructing the same uniquely owned record through a
+function call changes this loop from effectively linear to quadratic work.
 
-```llvm
-call void @roc_builtins_list_set(ptr %221, ptr %908, i64 %910, i64 %912, i32 8,
-                                 i64 %913, ptr %218, i64 8, i1 false,
-                                 ptr null, ptr null, i8 1, ptr null)
-```
-
-The projected field is increfed before the call and the trailing update-mode argument is `0`
-instead of `1`, so the builtin sees refcount 2 and clones. There are no refcount operations
-around the in-place call at all — the field is moved out. So this is ownership inference for
-record field projection, not runtime behaviour.
-
-## Why it matters
-
-The cost is invisible: same answer, same memory profile at rest, no diagnostic. A program can
-flip from linear to quadratic because a state record started being returned from a constructor
-instead of being written inline, or because an error branch was rewritten from `?` to `??`.
-
-In our case (a SAT solver whose state is one record of 13 flat lists) we could not find a
-record-threading shape that was reliably in place, and ended up passing every mutated list as a
-separate parameter and returning it in a tuple — `propagate` takes 13 arguments and returns a
-13-tuple. That is the `lists` mode above: robust in every shape we tried (11 of 11), but it
-makes the module API unreadable and it is not the shape the language wants you to write.
-
-## Broader survey
-
-We classified 62 code shapes on this workload (all with the compiler and flags above). Summary:
-
-- **Record field projection: 28 of 51 shapes clone.** The dividing lines include: literal vs
-  call-built record; `?` vs `??`; whether the record was passed to any function earlier in the
-  scope; whether the mutation is in a `while` loop or in straight-line code; whether a read
-  helper was called on the record before the write.
-- **Separate list values: 11 of 11 shapes stay in place**, including cross-module calls,
-  recursion, tuple returns, `Try` returns, nested loops, and rebuilding + destructuring a record
-  every iteration.
+The minimum shape needs two record fields and the `read($s)` helper after the loop. A one-field
+record, or reading the final list directly instead of passing the record to `read`, stays in
+place. Those details should not change whether the uniquely owned list can be mutated in place.
 
 ## Files
 
 | file | what |
 |---|---|
-| `record_field_clone.roc` | the four modes above, one file, no dependencies |
-| `run.sh` | builds and prints the table above (min of 3 runs) |
+| `main.roc` | minimal reproducer |
+| `run.sh` | builds it and measures both scaling dimensions |
