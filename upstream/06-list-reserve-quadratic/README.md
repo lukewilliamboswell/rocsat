@@ -1,68 +1,65 @@
-# `List.reserve` sets capacity exactly, so calling it while appending is quadratic
+# Calling `List.reserve(2)` before two appends makes a loop quadratic
 
-**Originally verified:** `nightly-2026-08-13-2fdd90e`, `roc build --opt=speed`, arm64 macOS.
+Hi, I found this performance issue while working on my project.
 
-**Latest nightly:** still reproduces on `nightly-2026-08-18-e9be50a`, Linux ARM64. At 4 M
-appends, repeated `reserve` took 3.00 s and plain append 10.4 ms, with the same quadratic
-scaling as the old nightly.
+**Compiler:** `nightly-2026-08-18-e9be50a`, Linux ARM64, `roc build --opt=speed`.
 
-## Problem
+## Example
 
-`List.reserve(list, k)` requests capacity `len + k` and that request is trusted verbatim — it
-does not take the geometric growth path. So the natural "make room for the next chunk" loop
-reallocates and copies the whole list on every call:
+This loop reserves room for two items and then appends two items:
 
 ```roc
-if $i % k == 0 {
-    $xs = $xs.reserve(k)     # capacity becomes exactly len + k, again and again
+main! = |args| {
+    n = U64.from_str(args.get(0)?)?
+
+    var $xs = []
+    while $xs.len() < n {
+        $xs = $xs.reserve(2)
+        $xs = $xs.append(0)
+        $xs = $xs.append(0)
+    }
+
+    Ok(echo!($xs.len().to_str()))
 }
-$xs = $xs.append(...)
 ```
 
-Meanwhile plain `List.append` — which is `reserve(list, 1)` plus `list_append_unsafe` — *does*
-grow geometrically, because a request of exactly `old_capacity + 1` is the one case
-`calculateCapacity` treats as growth. The result is that the call a user reaches for to make
-appending cheaper is the only one that is not amortised.
-
-## Reproduce
+Build and run it with even values of `n`:
 
 ```sh
-roc build --opt=speed reserve.roc
-for n in 1000000 2000000 4000000; do ./reserve reserve $n 4096; done
+roc build --opt=speed --output=app main.roc
+
+time ./app 10000
+time ./app 20000
+time ./app 40000
+time ./app 80000
 ```
 
-Wall clock, min of 3, `k = 4096`:
+These are the fastest times from three runs:
 
-| n | `reserve` every k appends | plain `append` | hand-tracked doubling `reserve` |
-|---|---|---|---|
-| 1 000 000 | 117 ms | 5.0 ms | 5.1 ms |
-| 2 000 000 | 499 ms (4.3×) | 7.2 ms | 7.3 ms |
-| 4 000 000 | 2 517 ms (5.0×) | 12.4 ms | 11.9 ms |
+| final list length | with `reserve(2)` | without the `reserve` line |
+|---:|---:|---:|
+| 10,000 | 152 ms | 0.35 ms |
+| 20,000 | 588 ms | 0.48 ms |
+| 40,000 | 2,322 ms | 0.79 ms |
+| 80,000 | 9,307 ms | 1.30 ms |
 
-Time roughly quadruples per doubling of `n`. The `manual` mode does the same number of
-`reserve` calls but doubles the requested capacity by hand, and is as fast as plain `append` —
-so the quadratic factor is entirely the growth policy, not the call.
+To run the faster version, remove only this line and rebuild:
 
-## Suggested fix
+```roc
+$xs = $xs.reserve(2)
+```
 
-Have `reserve` take `max(requested, geometric_growth(old_capacity))`, or at minimum return
-early when `capacity >= len + k` is already true. Either would make the loop above linear
-without changing what `reserve` guarantees.
+Both versions print the same list length. Doubling the length makes the version with `reserve` about four times slower, while plain append stays close to linear.
 
-If the exact-capacity behaviour is deliberate (`reserve` as "set capacity to exactly this"),
-then the docstring should say so. It currently reads
+## What seems to happen
+
+`List.reserve(2)` appears to set the capacity to exactly the current length plus two. The next two appends fill that space, so the next call allocates again and copies the whole list. Plain append leaves extra space and does not copy on every growth.
+
+The current documentation says:
 
 ```roc
 ## Ensure this list has room for at least spare additional items.
 reserve : List(item), U64 -> List(item)
 ```
 
-which promises a lower bound on capacity, not an exact one, and nothing warns that using it in
-a loop is asymptotically worse than not using it at all.
-
-## Files
-
-| file | what |
-|---|---|
-| `reserve.roc` | the three modes above, one file |
-| `run.sh` | builds and prints the table above (min of 3 runs) |
+I expected reserving enough room for the next two appends not to make the loop much slower than appending without it. Either `reserve` could leave extra room when it grows, or the documentation could warn that repeatedly reserving fixed-size chunks causes this behavior.
