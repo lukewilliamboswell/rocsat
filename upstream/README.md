@@ -26,7 +26,7 @@ remain:
 | # | Latest-nightly result |
 |---|---|
 | [01](01-record-field-clone/) | Reproduced. At 8 000 writes, `call_qq` took 98.9 s while the three in-place shapes took 6.1–6.8 ms; the old nightly took 97.5 s and 5.9–6.5 ms on this host. |
-| [02](02-nominal-pattern-segfault/) | Reproduced and reduced to one app file: 20 compiler segfaults in 20 uncached checks on both tested nightlies. Adding `..` to the empty nominal pattern checks cleanly. |
+| [02](02-nominal-pattern-segfault/) | Reproduced with both omitted and nonexistent nominal fields. The minimal app crashed in 20/20 uncached checks on both tested nightlies; its corrected pattern checks cleanly. |
 | [03](03-roc-test-speed-link/) | macOS linker symptom not testable on Linux. Speed-backend tests pass on both nightlies when `TMPDIR` is executable; this host's default no-exec `/tmp` otherwise causes an unrelated `PermissionDenied`. |
 | [04](04-opt-interpreter-link/) | macOS linker symptom not testable on Linux, but the backend is still broken here too: both nightlies report a successful interpreter build and the resulting hello-world immediately segfaults. |
 | [05](05-nested-list-clone/) | Reproduced. At 3.2 M appends, nested `update` took 23.6 s and flat storage 5.1 ms (old nightly: 23.4 s and 4.7 ms), with the same superlinear scaling. |
