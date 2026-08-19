@@ -145,13 +145,20 @@ def temp_file(data, suffix):
 
 
 def run(cmd, timeout, stdin_bytes=None, cwd=None):
-    """Runs cmd; returns (returncode or None on timeout, stdout, stderr, seconds)."""
-    t0 = time.perf_counter()
+    """Runs cmd; returns (returncode or None on timeout, stdout, stderr, seconds).
+
+    Each command owns a process group so timing out an adapter also kills its solver child.
+    """
+    started = time.perf_counter()
+    process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, cwd=cwd, start_new_session=True)
     try:
-        p = subprocess.run(cmd, input=stdin_bytes, capture_output=True, timeout=timeout, cwd=cwd)
-        return p.returncode, p.stdout, p.stderr, time.perf_counter() - t0
-    except subprocess.TimeoutExpired as e:
-        return None, e.stdout or b"", e.stderr or b"", time.perf_counter() - t0
+        stdout, stderr = process.communicate(input=stdin_bytes, timeout=timeout)
+        return process.returncode, stdout, stderr, time.perf_counter() - started
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        stdout, stderr = process.communicate()
+        return None, stdout, stderr, time.perf_counter() - started
 
 
 def run_measured(cmd, timeout, cwd=None):

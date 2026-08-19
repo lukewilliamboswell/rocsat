@@ -33,7 +33,9 @@ def check_model(cnf, stdout, timeout):
     dimocheck = common.tool("dimocheck")
     if not dimocheck:
         return None
-    model = common.temp_file(stdout, ".model")
+    competition_lines = [line for line in stdout.splitlines()
+                         if line.startswith((b"s ", b"v "))]
+    model = common.temp_file(b"\n".join(competition_lines) + b"\n", ".model")
     strict_cnf = common.temp_file(common.sanitized(cnf), ".cnf")
     try:
         rc, out, err, _ = common.run([dimocheck, strict_cnf, model], timeout)

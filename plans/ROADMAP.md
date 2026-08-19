@@ -35,8 +35,11 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 
 ## Phase 2 — infrastructure (grows alongside)
 
-- [ ] Nightly suite: all SATLIB + 100–200 GBD-selected competition instances, PAR-2 deltas,
-      1 h `runcnfuzz`, `hyperfine` min-of-N, RSS (after milestone 1)
+- [x] Compact diversity suite: 5,680 hash-pinned CNFs / 532 MiB, including 24 SATLIB/classic
+      sets and 81 distinct known-result Competition 2025 families; serial smoke/diversity tiers,
+      PAR-2/JSON comparison, solver counters, and Linux RSS
+- [ ] Long-running infrastructure: one-hour `runcnfuzz`, repeated min-of-N whole-suite baselines,
+      and optional larger competition instances when a compact representative misses a load shape
 - [x] Upstream reports: eight verified reproducers in `upstream/`; issues 01, 02, and 05 were
       filed as roc#10848, roc#10847, and roc#10849, and the remaining findings were raised in Roc
       forum discussions/comments. Reporting is closed for this project. Nominal method dispatch
@@ -55,7 +58,8 @@ the first place clauses get deleted. The end product is a library with a CLI fro
   100/100 flat200, versus MiniSat 82/100, 13/100, and 100/100. The roadmap's absolute all-uf250
   target was unrealistic on this host, but the relative solved-count target passes.
 - Reporting upstream is closed. `make check` remains the commit gate and `make canary` is required
-  for hot storage or API changes.
+  for hot storage or API changes. Use `make perf-smoke` for measured implementation increments and
+  `make perf-diverse` before accepting heuristic changes; both tiers are serial and outside CI.
 
 ## Log
 
@@ -73,3 +77,7 @@ the first place clauses get deleted. The end product is a library with a CLI fro
   clauses between calls, assumptions, models/values, phase control, and final conflicts. A
   10,000-query differential across 1,000 persistent sessions matched fresh PySAT; every SAT model
   and independently re-solved failed core passed.
+- 2026-08-19 — compact benchmark infrastructure complete: an atomic SHA-256 fetcher enforces a
+  900 MB budget; 81 compact competition families broaden the existing classic corpus to 532 MiB;
+  serial smoke/diversity runs distinguish timeouts from invalid answers and report PAR-2, RSS,
+  solver counters, and JSON deltas.

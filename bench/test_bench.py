@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import sys
 import tarfile
 import tempfile
+import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -124,6 +125,18 @@ class RunnerTests(unittest.TestCase):
             regression = bench_run.run_one(self.args(solver, False), str(cnf), "SAT")
             self.assertEqual(benchmark["status"], "unsolved")
             self.assertEqual(regression["status"], "fail")
+
+    def test_timeout_kills_adapter_descendants(self):
+        Path(common.OUT).mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=common.OUT) as tmp:
+            marker = Path(tmp) / "escaped"
+            adapter = Path(tmp) / "adapter.sh"
+            adapter.write_text(f"#!/bin/sh\n(sleep 0.15; touch '{marker}') &\nwait\n")
+            adapter.chmod(0o755)
+            rc, _, _, _ = common.run([str(adapter)], 0.02)
+            time.sleep(0.2)
+            self.assertIsNone(rc)
+            self.assertFalse(marker.exists())
 
     def test_model_and_solver_statistics_are_independent(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -30,7 +30,9 @@ with `bench/expected.py`; Kissat and MiniSat are optional comparison solvers.
     make build-dev     # --opt=dev    -> src/rocsat-dev (keeps inline `expect`s)
     make test          # roc test over src/
     make check         # test + regression + incremental differential + 30 s fuzz; commit gate
-    make canary        # timing canary: ns per clause on a 2 M implication chain vs bench/canary-ceiling.txt
+    make canary        # timing canary: ns/clause on a 2 M contradictory implication chain
+    make perf-smoke    # 40 serial representatives, 2 s cap, JSON under bench/out/
+    make perf-diverse  # 112 serial representatives, 10 s cap, JSON under bench/out/
 
 `src/rocsat <command> ...`: `solve <cnf> [proof.drat]` (CDCL; writes a text DRAT proof when a
 path is given), `incremental <transcript>`, `parse <cnf>`, `brute <cnf>` (enumeration reference,
@@ -78,12 +80,47 @@ uses Luby restarts; proof-safe watch rebuilds and compacting collection keep the
 bounded. Hot code takes and returns lists, never the state record — the header of `src/Core.roc`
 explains why and what shapes this Roc nightly keeps in place.
 
+## Benchmark corpus
+
+`bench/corpus.toml` is the reproducible corpus manifest. `bench/fetch.py` verifies every source
+archive or normalized CNF by SHA-256, replaces sets atomically, and refuses to cross its 900 MB
+budget. Corpus files remain ignored; `bench/corpus-profile.json` commits their static shape
+metadata and expected statuses live under `bench/expected/`.
+
+The current fetch contains 5,680 CNFs and 532 MiB of formula data: 24 small SATLIB/classic sets
+plus one known-result representative from each of 81 compact SAT Competition 2025 families. It
+covers random and crafted formulas, graph/CSP puzzles, planning and scheduling, hardware/BMC,
+software analysis, arithmetic and cryptography, parity/XOR, and mixed industrial encodings.
+Competition entries are capped at 75 MiB extracted. Their statuses come from GBD; the added
+SATLIB sets were independently classified with PySAT's CaDiCaL 1.9.5 backend (parity is SAT by
+construction, as its source states).
+
+Performance tiers are separate from `make check` and always run serially:
+
+- `perf-smoke`: 40 load representatives at two seconds, bounded to 80 seconds per build. The
+  acceptance runs took 48.7 seconds for rocsat and 44.4 seconds for MiniSat.
+- `perf-diverse`: 112 instances at ten seconds, bounded to 18 minutes 40 seconds per build. The
+  acceptance run took 12 minutes 51 seconds for rocsat.
+
+Benchmark timeouts mean *unsolved*, not failure; crashes, wrong known statuses, and invalid SAT
+models still fail. `--rss` samples direct-process peak RSS on Linux and JSON preserves solver
+counters. Compare two runs with:
+
+```
+uv run --script bench/compare.py baseline.json candidate.json --json comparison.json
+```
+
+`bench/minisat.sh` adapts a local MiniSat (`MINISAT_BIN=/path/to/minisat`) to the same output.
+Performance runs deliberately omit proofs because proof size is not bounded by input size; the
+normal regression gate continues to check every UNSAT proof.
+
 ## Layout
 
 - `src/` — the Roc app (`main.roc`) and solver modules
 - `bench/` — harness: `run.py` (instance sets, model/proof checks, PAR-2), `fuzz.py`,
-  `incremental.py` (fresh-PySAT sequence differential), `expected.py` (reference statuses in
-  `bench/expected/`), `regression.txt`, `canary.sh`
+  `incremental.py` (fresh-PySAT sequence differential), `fetch.py`/`corpus.toml` (hash-pinned
+  corpus), `profile.py`, `compare.py`, `expected.py` (reference statuses in `bench/expected/`),
+  performance manifests, `regression.txt`, and `canary.sh`
 - `tests/edge/` — hand-written edge-case CNFs
 - `research/`, `roc-docs/`, `spike/` — background material, frozen
 - `upstream/` — verified reproducers for the compiler and toolchain problems this project hit,
