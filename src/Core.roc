@@ -38,6 +38,7 @@ Core :: [].{
         activity : List(F64),
         heap : List(U32),
         hpos : List(U32),
+        phase : List(U8),
         search : Search,
         stats : Stats,
         proof : Proof,
@@ -91,6 +92,7 @@ Core :: [].{
             activity: List.repeat(0, n),
             heap: $heap,
             hpos: $hpos,
+            phase: List.repeat(1, n),
             search: { trail_len: 0, dl: 0, qhead: 0, heap_len: n, var_inc: 1.0, ok: Bool.True },
             stats: { conflicts: 0, decisions: 0, propagations: 0 },
             proof: { on: Bool.False, bytes: [], traced: 0 },
@@ -218,7 +220,7 @@ Core :: [].{
 
 expect {
     st = Core.new(3)
-    st.value.len() == 6 and st.search.trail_len == 0 and st.search.dl == 0 and st.search.ok
+    st.value.len() == 6 and st.phase == [1, 1, 1] and st.search.trail_len == 0 and st.search.dl == 0 and st.search.ok
 }
 
 expect {

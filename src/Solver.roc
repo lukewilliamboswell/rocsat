@@ -1,6 +1,6 @@
 # The CDCL solver: clause input at level 0, the search loop (propagate, analyse, backjump,
-# learn), model extraction and DRAT emission. Decision heuristic: EVSIDS with an activity heap,
-# initially negative phase. No restarts, no clause deletion, no minimisation.
+# learn), model extraction and DRAT emission. Decision heuristic: EVSIDS with an activity heap
+# and full phase saving. No restarts, no clause deletion, no minimisation.
 #
 # `add_all` and `search` are the owner loops: they hold the unpacked state in `var`s and apply
 # one list-level step per statement (see the shape rule in Core); `add_clauses` and `solve`
@@ -31,7 +31,7 @@ Solver :: [].{
     # found (`ok = false`) further clauses are ignored.
     add_clauses : Core.State, List(List(U32)) -> Core.State
     add_clauses = |st0, clauses| {
-        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, search, stats, proof } = st0
+        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, search, stats, proof } = st0
         expect search.dl == 0
         (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, bytes1, sc) =
             add_all(arena, pool, wofs, wlen, wcap, value, level, reason, trail, proof.bytes, { trail_len: search.trail_len, qhead: search.qhead, ok: search.ok, propagations: stats.propagations, proof_on: proof.on, traced: proof.traced }, clauses)
@@ -50,6 +50,7 @@ Solver :: [].{
             activity,
             heap,
             hpos,
+            phase,
             search: { ..search, trail_len: sc.trail_len, qhead: sc.qhead, ok: sc.ok },
             stats: { ..stats, propagations: sc.propagations },
             proof: { ..proof, bytes: bytes1, traced: sc.traced },
@@ -170,9 +171,9 @@ Solver :: [].{
 
     solve : Core.State -> (Core.State, [Sat, Unsat])
     solve = |st0| {
-        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, search, stats, proof } = st0
-        (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, trail_lim1, seen1, activity1, heap1, hpos1, bytes1, sc, status) =
-            search_loop(arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, proof.bytes, { trail_len: search.trail_len, dl: search.dl, qhead: search.qhead, heap_len: search.heap_len, var_inc: search.var_inc, ok: search.ok, conflicts: stats.conflicts, decisions: stats.decisions, propagations: stats.propagations, proof_on: proof.on, traced: proof.traced })
+        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, search, stats, proof } = st0
+        (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, trail_lim1, seen1, activity1, heap1, hpos1, phase1, bytes1, sc, status) =
+            search_loop(arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, proof.bytes, { trail_len: search.trail_len, dl: search.dl, qhead: search.qhead, heap_len: search.heap_len, var_inc: search.var_inc, ok: search.ok, conflicts: stats.conflicts, decisions: stats.decisions, propagations: stats.propagations, proof_on: proof.on, traced: proof.traced })
         st = {
             arena: arena1,
             pool: pool1,
@@ -188,6 +189,7 @@ Solver :: [].{
             activity: activity1,
             heap: heap1,
             hpos: hpos1,
+            phase: phase1,
             search: { trail_len: sc.trail_len, dl: sc.dl, qhead: sc.qhead, heap_len: sc.heap_len, var_inc: sc.var_inc, ok: sc.ok },
             stats: { conflicts: sc.conflicts, decisions: sc.decisions, propagations: sc.propagations },
             proof: { ..proof, bytes: bytes1, traced: sc.traced },
@@ -198,8 +200,8 @@ Solver :: [].{
     SearchScalars : { trail_len : U64, dl : U64, qhead : U64, heap_len : U64, var_inc : F64, ok : Bool, conflicts : U64, decisions : U64, propagations : U64, proof_on : Bool, traced : U64 }
 
     # The CDCL loop on the unpacked state.
-    search_loop : List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), SearchScalars -> (List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), SearchScalars, [Sat, Unsat])
-    search_loop = |arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, bytes, sc| {
+    search_loop : List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), List(U8), SearchScalars -> (List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), List(U8), SearchScalars, [Sat, Unsat])
+    search_loop = |arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, bytes, sc| {
         num_vars = level.len()
         proof_on = sc.proof_on
         var $arena = arena
@@ -218,6 +220,7 @@ Solver :: [].{
         var $activity = activity
         var $heap = heap
         var $hpos = hpos
+        var $phase = phase
         var $heap_len = sc.heap_len
         var $var_inc = sc.var_inc
         var $qhead = sc.qhead
@@ -261,13 +264,14 @@ Solver :: [].{
                     $var_inc = var_inc2
                     old_trail_len = $trail_len
                     (va2, tl2, dl2, q2) = Core.cancel_until($value, $trail, $trail_len, $trail_lim, $dl, bt.to_u64())
-                    (heap3, hpos3, heap_len3) = Branch.reinsert($activity, $heap, $hpos, $heap_len, $trail, tl2, old_trail_len)
+                    (heap3, hpos3, phase3, heap_len3) = Branch.backtrack($activity, $heap, $hpos, $heap_len, $phase, $trail, tl2, old_trail_len)
                     $value = va2
                     $trail_len = tl2
                     $dl = dl2
                     $qhead = q2
                     $heap = heap3
                     $hpos = hpos3
+                    $phase = phase3
                     $heap_len = heap_len3
                     if proof_on {
                         $bytes = Drat.add_clause($bytes, learnt)
@@ -309,7 +313,8 @@ Solver :: [].{
                     $trail_lim = Core.put($trail_lim, $dl, $trail_len.to_u32_wrap())
                     $dl = $dl + 1
                     $decisions = $decisions + 1
-                    (va3, le3, re3, tr3, tl3) = Core.assign($value, $level, $reason, $trail, $trail_len, (2 * v + 1).to_u32_wrap(), Core.none, dl + 1)
+                    sign = ($phase.get(v) ?? 1).to_u64()
+                    (va3, le3, re3, tr3, tl3) = Core.assign($value, $level, $reason, $trail, $trail_len, (2 * v + sign).to_u32_wrap(), Core.none, dl + 1)
                     $value = va3
                     $level = le3
                     $reason = re3
@@ -321,7 +326,7 @@ Solver :: [].{
             }
         }
         scalars = { trail_len: $trail_len, dl: $dl, qhead: $qhead, heap_len: $heap_len, var_inc: $var_inc, ok: $ok, conflicts: $conflicts, decisions: $decisions, propagations: $props, proof_on, traced: $traced }
-        ($arena, $pool, $wofs, $wlen, $wcap, $value, $level, $reason, $trail, $trail_lim, $seen, $activity, $heap, $hpos, $bytes, scalars, if $status == Sat { Sat } else { Unsat })
+        ($arena, $pool, $wofs, $wlen, $wcap, $value, $level, $reason, $trail, $trail_lim, $seen, $activity, $heap, $hpos, $phase, $bytes, scalars, if $status == Sat { Sat } else { Unsat })
     }
 
     # The assignment after a `Sat` result: every variable is assigned.

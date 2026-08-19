@@ -121,17 +121,20 @@ Branch :: [].{
         ($heap, $hpos, $len, $picked)
     }
 
-    # Reinserts variables from the erased trail suffix when they were previously discarded by a
-    # lazy heap pick. `trail[start..end]` is unchanged storage whose assignments were just erased.
-    reinsert : List(F64), List(U32), List(U32), U64, List(U32), U64, U64 -> (List(U32), List(U32), U64)
-    reinsert = |activity, heap, hpos, heap_len, trail, start, end| {
+    # Saves the sign and reinserts previously discarded variables from an erased trail suffix.
+    # `trail[start..end]` is unchanged storage whose assignments were just erased.
+    backtrack : List(F64), List(U32), List(U32), U64, List(U8), List(U32), U64, U64 -> (List(U32), List(U32), List(U8), U64)
+    backtrack = |activity, heap, hpos, heap_len, phase, trail, start, end| {
         var $heap = heap
         var $hpos = hpos
+        var $phase = phase
         var $len = heap_len
         var $k = start
         while $k < end {
-            v32 = (trail.get($k) ?? 0).shr_wrap(1)
+            lit = trail.get($k) ?? 0
+            v32 = lit.shr_wrap(1)
             v = v32.to_u64()
+            $phase = Core.put($phase, v, lit.bitwise_and(1).to_u8_wrap())
             if ($hpos.get(v) ?? absent) == absent {
                 expect $len < $heap.len()
                 $heap = Core.put($heap, $len, v32)
@@ -156,7 +159,7 @@ Branch :: [].{
             }
             $k = $k + 1
         }
-        ($heap, $hpos, $len)
+        ($heap, $hpos, $phase, $len)
     }
 
     # Heap and inverse-position invariant for the live prefix. O(n); tests only.
@@ -189,8 +192,8 @@ Branch :: [].{
 expect {
     (activity, heap, hpos, len) = Branch.new(5)
     (heap1, hpos1, len1, v0) = Branch.pick(activity, heap, hpos, len, List.repeat(Model.unassigned, 10), 5)
-    (heap2, hpos2, len2) = Branch.reinsert(activity, heap1, hpos1, len1, [0, 0, 0, 0, 0], 0, 1)
-    v0 == 0 and len1 == 4 and len2 == 5 and Branch.consistent(activity, heap2, hpos2, len2)
+    (heap2, hpos2, phase2, len2) = Branch.backtrack(activity, heap1, hpos1, len1, List.repeat(1, 5), [0, 0, 0, 0, 0], 0, 1)
+    v0 == 0 and len1 == 4 and len2 == 5 and (phase2.get(0) ?? 1) == 0 and Branch.consistent(activity, heap2, hpos2, len2)
 }
 
 expect {
@@ -205,6 +208,13 @@ expect {
     assigned = [Model.true_val, Model.false_val, Model.unassigned, Model.unassigned, Model.unassigned, Model.unassigned]
     (heap1, hpos1, len1, v) = Branch.pick(activity, heap, hpos, len, assigned, 3)
     v == 1 and len1 == 1 and (hpos1.get(0) ?? 0) == Branch.absent and Branch.consistent(activity, heap1, hpos1, len1)
+}
+
+expect {
+    (activity, heap, hpos, len) = Branch.new(2)
+    (heap1, hpos1, len1, _) = Branch.pick(activity, heap, hpos, len, List.repeat(Model.unassigned, 4), 2)
+    (heap2, hpos2, phase2, len2) = Branch.backtrack(activity, heap1, hpos1, len1, [1, 0], [0, 3], 0, 2)
+    phase2 == [0, 1] and len2 == 2 and Branch.consistent(activity, heap2, hpos2, len2)
 }
 
 expect {
