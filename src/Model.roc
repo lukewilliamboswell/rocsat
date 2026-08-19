@@ -5,6 +5,7 @@
 # assignments are accepted exactly when they already satisfy every clause.
 
 import Dimacs
+import Scanner
 
 Model :: [].{
     Assignment : List(U8)
@@ -59,7 +60,7 @@ Model :: [].{
                     if c == '\n' or c == '\r' or $i >= n {
                         $in_line = Bool.False
                     } else {
-                        num = match Dimacs.read_number(bytes, $i) {
+                        num = match Scanner.read_number(bytes, $i) {
                             Ok(x) => x
                             Err(_) => return Err(UnexpectedByte($i))
                         }
@@ -80,7 +81,7 @@ Model :: [].{
                     }
                 }
             } else {
-                $i = Dimacs.skip_line(bytes, $i) + 1
+                $i = Scanner.skip_line(bytes, $i) + 1
             }
         }
         if !$seen_v {

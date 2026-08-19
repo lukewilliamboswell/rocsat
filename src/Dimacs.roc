@@ -11,6 +11,8 @@
 #
 # Literal encoding: `2 * (var - 1) + (1 if negative)`, so `lit ^ 1` negates.
 
+import Scanner
+
 Dimacs :: [].{
     Cnf : { num_vars : U64, clauses : List(List(U32)) }
 
@@ -22,12 +24,19 @@ Dimacs :: [].{
     ]
 
     max_var : U64
-    max_var = 2147483647
+    max_var = Scanner.max_number
+
+    read_number : List(U8), U64 -> Try({ value : U64, sign : U64, next : U64 }, Error)
+    read_number = |bytes, start| match Scanner.read_number(bytes, start) {
+        Ok(num) => Ok(num)
+        Err(UnexpectedByte(at)) => Err(UnexpectedByte(at))
+        Err(VariableTooLarge(at)) => Err(VariableTooLarge(at))
+    }
 
     parse : List(U8) -> Try(Cnf, Error)
     parse = |bytes| {
         n = bytes.len()
-        var $i = skip_comments(bytes, 0)
+        var $i = Scanner.skip_comments(bytes, 0)
         header = read_header(bytes, $i)?
         $i = header.next
         var $num_vars = header.num_vars
@@ -35,12 +44,12 @@ Dimacs :: [].{
         var $lits = []
         var $done = Bool.False
         while !$done {
-            $i = skip_comments(bytes, $i)
+            $i = Scanner.skip_comments(bytes, $i)
             b = bytes.get($i) ?? 0
             if $i >= n or b == '%' {
                 $done = Bool.True
             } else if b == 'p' {
-                $i = skip_line(bytes, $i)
+                $i = Scanner.skip_line(bytes, $i)
             } else {
                 num = read_number(bytes, $i)?
                 $i = num.next
@@ -60,47 +69,13 @@ Dimacs :: [].{
         }
     }
 
-    is_space : U8 -> Bool
-    is_space = |b| b == ' ' or (b >= 9 and b <= 13)
-
-    # Skips whitespace and whole `c` lines.
-    skip_comments : List(U8), U64 -> U64
-    skip_comments = |bytes, start| {
-        n = bytes.len()
-        var $i = start
-        var $done = Bool.False
-        while !$done {
-            b = bytes.get($i) ?? 0
-            if $i >= n {
-                $done = Bool.True
-            } else if is_space(b) {
-                $i = $i + 1
-            } else if b == 'c' {
-                $i = skip_line(bytes, $i)
-            } else {
-                $done = Bool.True
-            }
-        }
-        $i
-    }
-
-    skip_line : List(U8), U64 -> U64
-    skip_line = |bytes, start| {
-        n = bytes.len()
-        var $i = start
-        while $i < n and (bytes.get($i) ?? 0) != '\n' {
-            $i = $i + 1
-        }
-        $i
-    }
-
     # `p cnf V C`, with any amount of whitespace between tokens.
     read_header : List(U8), U64 -> Try({ num_vars : U64, num_clauses : U64, next : U64 }, Error)
     read_header = |bytes, start| {
         if bytes.get(start) != Ok('p') {
             return Err(MissingHeader(start))
         }
-        var $i = skip_spaces(bytes, start + 1)
+        var $i = Scanner.skip_spaces(bytes, start + 1)
         if bytes.get($i) != Ok('c') or bytes.get($i + 1) != Ok('n') or bytes.get($i + 2) != Ok('f') {
             return Err(MissingHeader($i))
         }
@@ -112,44 +87,6 @@ Dimacs :: [].{
         Ok({ num_vars: v.value, num_clauses: c.value, next: c.next })
     }
 
-    skip_spaces : List(U8), U64 -> U64
-    skip_spaces = |bytes, start| {
-        var $i = start
-        while is_space(bytes.get($i) ?? 0) {
-            $i = $i + 1
-        }
-        $i
-    }
-
-    # An optionally signed decimal number at `start` (leading whitespace allowed); `sign` is 1 for
-    # `-`. Digits must be followed by whitespace or end of file. Values above `max_var` are rejected
-    # so that `2 * var + 1` fits in a U32.
-    read_number : List(U8), U64 -> Try({ value : U64, sign : U64, next : U64 }, Error)
-    read_number = |bytes, start| {
-        n = bytes.len()
-        var $i = skip_spaces(bytes, start)
-        first = bytes.get($i) ?? 0
-        sign = if first == '-' { 1 } else { 0 }
-        if first == '-' or first == '+' {
-            $i = $i + 1
-        }
-        digits_start = $i
-        var $value = 0
-        while $i < n and is_digit(bytes.get($i) ?? 0) {
-            $value = $value * 10 + (bytes.get($i) ?? 0).to_u64() - '0'
-            if $value > max_var {
-                return Err(VariableTooLarge(digits_start))
-            }
-            $i = $i + 1
-        }
-        if $i == digits_start or ($i < n and !is_space(bytes.get($i) ?? 0)) {
-            return Err(UnexpectedByte($i))
-        }
-        Ok({ value: $value, sign, next: $i })
-    }
-
-    is_digit : U8 -> Bool
-    is_digit = |b| b >= '0' and b <= '9'
 }
 
 expect Dimacs.parse("p cnf 2 1\n1 -2 0\n".to_utf8()) == Ok({ num_vars: 2, clauses: [[0, 3]] })
