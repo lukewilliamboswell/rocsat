@@ -8,6 +8,7 @@ import Dimacs
 import Model
 import Brute
 import Rocsat
+import Incremental
 
 version = "0.0.0"
 
@@ -17,6 +18,7 @@ usage =
     \\commands:
     \\  parse <file.cnf>  read a DIMACS file and print its size
     \\  solve <file.cnf> [proof.drat]  CDCL solve; exit 10 SAT / 20 UNSAT; DRAT proof if a path is given
+    \\  incremental <file>  run `+ clause 0` / `? assumptions 0` operations
     \\  brute <file.cnf>  solve by enumeration (<= 24 vars); exit 10 SAT / 20 UNSAT
     \\  check <file.cnf> <model>  verify competition v-lines against the formula
     \\  version           print the version
@@ -29,6 +31,7 @@ main! = |args| {
         ["parse", file] => parse!(file)
         ["solve", file] => solve!(file, None)
         ["solve", file, proof] => solve!(file, Some(proof))
+        ["incremental", file] => incremental!(file)
         ["brute", file] => brute!(file)
         ["check", file, model] => check!(file, model)
         ["version"] => Stdout.line!("rocsat ${version}")
@@ -87,6 +90,54 @@ solve! = |file, proof_path| {
         Sat => report_sat!(Rocsat.model(st))
         Unsat => report_unsat!({})
     }
+}
+
+incremental! : Str => Try({}, _)
+incremental! = |file| {
+    bytes = Path.utf8(file).read_bytes!()?
+    operations = match Incremental.parse(bytes) {
+        Ok(ops) => ops
+        Err(err) => {
+            Stderr.line!("c error: ${file}: ${Str.inspect(err)}")?
+            return Err(Exit(1))
+        }
+    }
+    var $state = Rocsat.new({})
+    for operation in operations {
+        match operation {
+            Add(clause) => match Rocsat.add_clause($state, clause) {
+                Ok(next) => { $state = next }
+                Err(err) => {
+                    Stderr.line!("c error: ${Str.inspect(err)}")?
+                    return Err(Exit(1))
+                }
+            }
+            Solve(assumptions) => match Rocsat.solve($state, assumptions) {
+                Err(err) => {
+                    Stderr.line!("c error: ${Str.inspect(err)}")?
+                    return Err(Exit(1))
+                }
+                Ok((next, Sat)) => {
+                    $state = next
+                    Stdout.line!("s SATISFIABLE")?
+                    for line in Model.format_v_lines(Rocsat.model($state)) { Stdout.line!(line)? }
+                }
+                Ok((next, Unsat)) => {
+                    $state = next
+                    Stdout.line!("s UNSATISFIABLE")?
+                    Stdout.line!(format_final(Rocsat.final_conflict($state)))?
+                }
+            }
+        }
+    }
+    Ok({})
+}
+
+format_final : List(I32) -> Str
+format_final = |lits| {
+    var $line = "u"
+    for lit in lits { $line = $line.concat(" ${lit.to_str()}") }
+    $line.concat(" 0")
 }
 
 report_sat! : Model.Assignment => Try({}, _)
