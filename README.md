@@ -39,14 +39,16 @@ path is given), `parse <cnf>`, `brute <cnf>` (enumeration reference, ≤ 24 vars
 `s`/`v` lines, and exit 10 (SAT) / 20 (UNSAT).
 
 Solver structure (`src/`): `Core` (state record, arena, watch pool, trail primitives), `Propagate`
-(2WL unit propagation), `Analyze` (1-UIP), `Drat` (proof lines), `Solver` (clause input, search
-loop, model). Hot code takes and returns lists, never the state record — the header of
-`src/Core.roc` explains why and what shapes this Roc nightly keeps in place.
+(2WL unit propagation), `Analyze` (1-UIP and recursive minimization), `Branch` (deterministic
+EVSIDS and phase saving), `Reduce` (LBD tiers, learned-clause deletion, arena GC), `Simplify`
+(level-0 clause cleanup), `Drat` (proof lines), and `Solver` (clause input and search loop). Search
+uses Luby restarts; proof-safe watch rebuilds and compacting collection keep the learned database
+bounded. Hot code takes and returns lists, never the state record — the header of `src/Core.roc`
+explains why and what shapes this Roc nightly keeps in place.
 
 ## Layout
 
-- `src/` — the Roc app (`main.roc`) and modules (`Dimacs`, `Model`, `Brute`, `Core`, `Propagate`,
-  `Analyze`, `Drat`, `Solver`)
+- `src/` — the Roc app (`main.roc`) and solver modules
 - `bench/` — harness: `run.py` (instance sets, model/proof checks, PAR-2), `fuzz.py`,
   `expected.py` (reference statuses in `bench/expected/`), `regression.txt`, `canary.sh`
 - `tests/edge/` — hand-written edge-case CNFs

@@ -12,7 +12,7 @@ draft, plus the Roc files, plus (where the symptom is timing or flakiness) a way
 Every timing MRE prints a checksum so the modes can be compared for equality, and takes its
 sizes from `argv` so nothing is constant-folded at compile time.
 
-Filed upstream: [01 as roc#10848](https://github.com/roc-lang/roc/issues/10848), [02 as roc#10847](https://github.com/roc-lang/roc/issues/10847), and [05 as roc#10849](https://github.com/roc-lang/roc/issues/10849). Issues 03, 06, and 08 are awaiting feedback from Roc forum discussions. Search for duplicates before filing the remaining reports.
+Filed upstream: [01 as roc#10848](https://github.com/roc-lang/roc/issues/10848), [02 as roc#10847](https://github.com/roc-lang/roc/issues/10847), and [05 as roc#10849](https://github.com/roc-lang/roc/issues/10849). The remaining findings were raised in Roc forum discussions/comments. Reporting is closed for this project; these directories remain as evidence, not a filing queue.
 
 ## Latest-nightly retest
 
@@ -50,7 +50,7 @@ the latest nightly.
 | [07](07-helper-not-inlined/) | A two-line, one-use helper body with two `List.set` calls remains a function call and makes the loop about seven times slower | Missed optimisation | Hot loops written as one function |
 | [08](08-docs-expect-opt-speed/) | Mini-tutorial says `--opt=speed` does not discard `expect`s yet; it does | Docs | Wrong early design assumption |
 
-Issue **07** is the next report to prepare. Issue **04** still needs a current macOS run; issues **03**, **06**, and **08** are paused for forum feedback.
+No further filing or review work is planned here. Platform-specific caveats in the individual reports remain part of the evidence.
 
 ## The two that shaped the project
 

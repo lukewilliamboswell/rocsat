@@ -78,11 +78,13 @@ Reduce :: [].{
             $i = $i + 1
         }
         db = counts($arena)
-        collect = db.dead_words * 5 > $arena.len()
+        # One-sixth dead storage is the exact boundary for arena <= 1.2 * live storage.
+        collect = db.dead_words * 6 > $arena.len()
         (arena1, reason1) = if collect { compact($arena, reason, value) } else { ($arena, reason) }
         (pool, wofs, wlen, wcap) = Core.rebuild_watches(arena1, value.len())
         bytes1 = if proof_on { bytes.concat($deletions) } else { bytes }
         expect Core.watches_consistent(arena1, pool, wofs, wlen)
+        expect counts(arena1).dead_words * 6 <= arena1.len()
         (arena1, pool, wofs, wlen, wcap, reason1, bytes1, target, $live_learnts, if collect { 1 } else { 0 })
     }
 
