@@ -5,14 +5,18 @@ import hashlib
 import io
 import lzma
 from pathlib import Path
+from types import SimpleNamespace
 import sys
 import tarfile
 import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import common
+import compare
 import fetch
 import profile as cnf_profile
+import run as bench_run
 
 
 class CorpusFetchTests(unittest.TestCase):
@@ -100,6 +104,48 @@ bytes=1
 """)
             with self.assertRaisesRegex(ValueError, "unsafe set"):
                 fetch.load_manifest(path)
+
+
+class RunnerTests(unittest.TestCase):
+    def args(self, binary, benchmark):
+        return SimpleNamespace(binary=str(binary), subcommand="solve", max_vars=0, drat=False,
+                               timeout=0.02, benchmark=benchmark, rss=False, rerun=False)
+
+    def test_benchmark_timeout_is_unsolved_but_regression_timeout_fails(self):
+        Path(common.OUT).mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=common.OUT) as tmp:
+            root = Path(tmp)
+            cnf = root / "x.cnf"
+            cnf.write_text("p cnf 0 0\n")
+            solver = root / "slow.py"
+            solver.write_text("#!/usr/bin/env python3\nimport time\ntime.sleep(1)\n")
+            solver.chmod(0o755)
+            benchmark = bench_run.run_one(self.args(solver, True), str(cnf), "SAT")
+            regression = bench_run.run_one(self.args(solver, False), str(cnf), "SAT")
+            self.assertEqual(benchmark["status"], "unsolved")
+            self.assertEqual(regression["status"], "fail")
+
+    def test_model_and_solver_statistics_are_independent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cnf = Path(tmp) / "x.cnf"
+            cnf.write_text("p cnf 2 2\n1 -2 0\n2 0\n")
+            output = b"c conflicts=7 arena=10/8 rate=1.5\ns SATISFIABLE\nv 1 2 0\n"
+            self.assertIsNone(common.verify_model(cnf, output))
+            self.assertEqual(common.solver_stats(output),
+                             {"conflicts": 7, "arena": "10/8", "rate": 1.5})
+            self.assertIn("clause 2", common.verify_model(cnf, b"v 1 -2 0\n"))
+
+    def test_comparison_reports_solved_par2_stats_and_regressions(self):
+        def result(seconds, status="ok", stats=None):
+            return {"instance": "x.cnf", "seconds": seconds, "status": status,
+                    "solver_stats": stats or {}}
+        baseline = {"timeout": 2, "results": [result(1.0, stats={"conflicts": 3})]}
+        candidate = {"timeout": 2, "results": [result(1.5, stats={"conflicts": 3})]}
+        got = compare.summarize(baseline, candidate)
+        self.assertEqual(got["baseline_solved"], 1)
+        self.assertEqual(got["candidate_par2"], 1.5)
+        self.assertEqual(got["identical_search"], 1)
+        self.assertEqual(len(got["regressions"]), 1)
 
 
 class ProfileTests(unittest.TestCase):

@@ -2,6 +2,8 @@
 
 import glob
 import os
+from pathlib import Path
+import signal
 import subprocess
 import tempfile
 import time
@@ -150,6 +152,93 @@ def run(cmd, timeout, stdin_bytes=None, cwd=None):
         return p.returncode, p.stdout, p.stderr, time.perf_counter() - t0
     except subprocess.TimeoutExpired as e:
         return None, e.stdout or b"", e.stderr or b"", time.perf_counter() - t0
+
+
+def run_measured(cmd, timeout, cwd=None):
+    """Runs a command with a timeout and samples peak RSS from Linux procfs.
+
+    Output goes to temporary files so a large SAT model cannot block while the parent samples.
+    Returns the same fields as `run`, plus peak RSS in KiB (or None off Linux).
+    """
+    started = time.perf_counter()
+    with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
+        process = subprocess.Popen(cmd, stdout=stdout, stderr=stderr, cwd=cwd, start_new_session=True)
+        peak_kib = None
+        timed_out = False
+        while True:
+            try:
+                status = Path(f"/proc/{process.pid}/status").read_text()
+                for line in status.splitlines():
+                    if line.startswith(("VmHWM:", "VmRSS:")):
+                        value = int(line.split()[1])
+                        peak_kib = value if peak_kib is None else max(peak_kib, value)
+            except (FileNotFoundError, PermissionError, ValueError):
+                pass
+            if process.poll() is not None:
+                break
+            if time.perf_counter() - started >= timeout:
+                os.killpg(process.pid, signal.SIGKILL)
+                timed_out = True
+                break
+            time.sleep(0.005)
+        process.wait()
+        stdout.seek(0)
+        stderr.seek(0)
+        return (None if timed_out else process.returncode, stdout.read(), stderr.read(),
+                time.perf_counter() - started, peak_kib)
+
+
+def solver_stats(stdout):
+    """Parse `c key=value` solver counters, retaining ratios as strings."""
+    stats = {}
+    for line in stdout.decode(errors="replace").splitlines():
+        if not line.startswith("c "):
+            continue
+        for field in line[2:].split():
+            if "=" not in field:
+                continue
+            key, value = field.split("=", 1)
+            try:
+                stats[key] = int(value)
+            except ValueError:
+                try:
+                    stats[key] = float(value)
+                except ValueError:
+                    stats[key] = value
+    return stats
+
+
+def model_literals(stdout):
+    """Signed literals from competition-format `v` lines, or None if there are none."""
+    literals = []
+    for line in stdout.decode(errors="replace").splitlines():
+        if line == "v" or line.startswith("v "):
+            for token in line[1:].split():
+                literal = int(token)
+                if literal:
+                    literals.append(literal)
+    return literals or None
+
+
+def verify_model(cnf, stdout):
+    """None when stdout contains a consistent model satisfying cnf, otherwise a reason."""
+    _, clauses = parse_cnf(Path(cnf).read_bytes())
+    try:
+        literals = model_literals(stdout)
+    except ValueError:
+        return "invalid literal in model"
+    if literals is None:
+        return None if not clauses else "no model literals"
+    assignment = {}
+    for literal in literals:
+        variable, value = abs(literal), literal > 0
+        if variable in assignment and assignment[variable] != value:
+            return f"contradictory values for variable {variable}"
+        assignment[variable] = value
+    for index, clause in enumerate(clauses, 1):
+        if not any(assignment.get(abs(literal)) == (literal > 0) for literal in clause):
+            return f"clause {index} is not satisfied"
+    return None
 
 
 def solution_status(stdout):

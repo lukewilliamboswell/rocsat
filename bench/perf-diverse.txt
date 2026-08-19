@@ -1,0 +1,22 @@
+# All compact Competition 2025 families plus structured/classic samples: 112 instances.
+competition-2025
+uf250-1065[:5]
+uuf250-1065[:5]
+flat200-479[:3]
+bench/corpus/hole/hole6.cnf
+bench/corpus/hole/hole7.cnf
+aim[:2]
+dubois[:1]
+pret[:1]
+planning-blocksworld[:1]
+planning-logistics[:1]
+quasigroup[:1]
+bmc[:1]
+jnh[:1]
+parity[:1]
+ssa[:1]
+bf[:1]
+hanoi[:1]
+inductive-inference[:1]
+beijing[:1]
+ais[:1]

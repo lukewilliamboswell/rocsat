@@ -3,7 +3,7 @@ SOLVER := solve
 # Instance-size cap for the fuzz generators (the brute reference is capped at 24 variables).
 MAX_VARS := 24
 
-.PHONY: build build-dev test bench-test check regression incremental fuzz canary
+.PHONY: build build-dev test bench-test check regression incremental fuzz canary perf-smoke perf-diverse
 
 build:
 	$(ROC) build --opt=speed --output=src/rocsat src/main.roc
@@ -28,6 +28,12 @@ fuzz: build build-dev
 
 canary: build
 	bench/canary.sh
+
+perf-smoke: build
+	uv run --script bench/run.py src/rocsat $(SOLVER) bench/perf-smoke.txt --benchmark --timeout 2 --jobs 1 --rss --json bench/out/perf-smoke.json
+
+perf-diverse: build
+	uv run --script bench/run.py src/rocsat $(SOLVER) bench/perf-diverse.txt --benchmark --timeout 10 --jobs 1 --rss --json bench/out/perf-diverse.json
 
 # Everything a commit must pass. Needs bench/tools.sh and bench/fetch.py once.
 check: test bench-test regression incremental fuzz

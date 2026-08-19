@@ -13,7 +13,8 @@ checked with drat-trim when `--drat` is given (the proof path is passed as an ex
 Prints failures, solved count and PAR-2; exit status 1 on any failure.
 
 Options: --timeout S (default 60), --jobs N, --max-vars N (skip larger instances), --drat,
---rerun (run twice, stdout must be identical), --json FILE.
+--rerun (run twice, stdout must be identical), --benchmark (timeouts are unsolved), --rss,
+--json FILE.
 """
 
 import argparse
@@ -25,24 +26,23 @@ from concurrent.futures import ThreadPoolExecutor
 import common
 
 
-def check_model(binary, cnf, stdout, timeout):
+def check_model(cnf, stdout, timeout):
+    failure = common.verify_model(cnf, stdout)
+    if failure:
+        return f"model rejected: {failure}"
+    dimocheck = common.tool("dimocheck")
+    if not dimocheck:
+        return None
     model = common.temp_file(stdout, ".model")
+    strict_cnf = common.temp_file(common.sanitized(cnf), ".cnf")
     try:
-        rc, _, err, _ = common.run([binary, "check", cnf, model], timeout)
+        rc, out, err, _ = common.run([dimocheck, strict_cnf, model], timeout)
         if rc != 0:
-            return f"model rejected: {err.decode(errors='replace').strip()}"
-        dimocheck = common.tool("dimocheck")
-        if dimocheck:
-            strict_cnf = common.temp_file(common.sanitized(cnf), ".cnf")
-            try:
-                rc, out, err, _ = common.run([dimocheck, strict_cnf, model], timeout)
-            finally:
-                os.unlink(strict_cnf)
-            if rc != 0:
-                return f"dimocheck rejected: {(out + err).decode(errors='replace').strip()[-200:]}"
+            return f"dimocheck rejected: {(out + err).decode(errors='replace').strip()[-200:]}"
         return None
     finally:
         os.unlink(model)
+        os.unlink(strict_cnf)
 
 
 def run_one(args, cnf, expected):
@@ -51,38 +51,48 @@ def run_one(args, cnf, expected):
     if args.max_vars and common.header_vars(cnf) > args.max_vars:
         result["status"] = "skipped"
         return result
+    if args.benchmark and not expected:
+        result.update(status="fail", reason="benchmark instance has no expected status")
+        return result
     cmd = [args.binary, args.subcommand, cnf]
     proof = None
     if args.drat:
         os.makedirs(common.OUT, exist_ok=True)
         proof = os.path.join(common.OUT, os.path.basename(cnf) + ".drat")
         cmd.append(proof)
-    rc, out, err, secs = common.run(cmd, args.timeout)
+    if args.rss:
+        rc, out, err, secs, peak_kib = common.run_measured(cmd, args.timeout)
+        result["peak_rss_kib"] = peak_kib
+    else:
+        rc, out, err, secs = common.run(cmd, args.timeout)
     result["seconds"] = round(secs, 4)
     result["rc"] = rc
     fail = None
-    if rc is None:
+    timed_out = rc is None
+    if timed_out and not args.benchmark:
         fail = "timeout"
-    elif rc not in (10, 20):
+    elif rc is not None and rc not in (10, 20):
         fail = f"exit {rc}: {err.decode(errors='replace').strip()[-200:]}"
-    else:
+    elif rc is not None:
         got = "SAT" if rc == 10 else "UNSAT"
         result["got"] = got
+        result["solver_stats"] = common.solver_stats(out)
         if common.solution_status(out) != got:
             fail = f"exit {rc} but stdout says {common.solution_status(out)}"
         elif expected and expected != got:
             fail = f"expected {expected}, got {got}"
         elif got == "SAT":
-            fail = check_model(args.binary, cnf, out, args.timeout)
+            fail = check_model(cnf, out, args.timeout)
         elif args.drat:
             fail = common.check_proof(cnf, proof, args.timeout)
         if fail is None and args.rerun:
-            rc2, out2, _, _ = common.run(cmd, args.timeout)
+            rerun = common.run_measured(cmd, args.timeout) if args.rss else common.run(cmd, args.timeout)
+            rc2, out2 = rerun[0], rerun[1]
             if rc2 != rc or out2 != out:
                 fail = "nondeterministic: second run differs"
     if proof and os.path.isfile(proof) and fail is None:
         os.unlink(proof)
-    result["status"] = "fail" if fail else "ok"
+    result["status"] = "fail" if fail else "unsolved" if timed_out else "ok"
     if fail:
         result["reason"] = fail
     return result
@@ -94,12 +104,20 @@ def main():
     ap.add_argument("subcommand")
     ap.add_argument("specs", nargs="+")
     ap.add_argument("--timeout", type=float, default=60)
-    ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2))
+    ap.add_argument("--jobs", type=int)
     ap.add_argument("--max-vars", type=int, default=0)
     ap.add_argument("--drat", action="store_true")
     ap.add_argument("--rerun", action="store_true")
+    ap.add_argument("--benchmark", action="store_true",
+                    help="treat timeouts as unsolved and require known expected statuses")
+    ap.add_argument("--rss", action="store_true", help="sample peak RSS; requires --jobs 1")
     ap.add_argument("--json")
     args = ap.parse_args()
+    args.jobs = args.jobs or (1 if args.benchmark else max(1, (os.cpu_count() or 2) // 2))
+    if args.rss and args.jobs != 1:
+        ap.error("--rss requires --jobs 1")
+    if args.benchmark and args.drat:
+        ap.error("benchmark runs do not retain proofs")
 
     files = common.resolve_instances(args.specs)
     expected_by_set = {}
@@ -114,18 +132,22 @@ def main():
 
     ran = [r for r in results if r["status"] != "skipped"]
     fails = [r for r in ran if r["status"] == "fail"]
+    unsolved = [r for r in ran if r["status"] == "unsolved"]
     for r in fails:
         print(f"FAIL {r['instance']}: {r['reason']}")
-    solved = len(ran) - len(fails)
+    solved = sum(r["status"] == "ok" for r in ran)
     par2 = sum(r.get("seconds", 0) if r["status"] == "ok" else 2 * args.timeout for r in ran)
     total = sum(r.get("seconds", 0) for r in ran)
-    print(f"{args.subcommand}: {solved}/{len(ran)} ok, {len(fails)} failed, "
-          f"{len(results) - len(ran)} skipped; total {total:.2f}s, PAR-2 {par2:.2f}s"
+    print(f"{args.subcommand}: {solved}/{len(ran)} solved, {len(unsolved)} unsolved, "
+          f"{len(fails)} failed, {len(results) - len(ran)} skipped; total {total:.2f}s, "
+          f"PAR-2 {par2:.2f}s"
           + (f", slowest {max(r.get('seconds', 0) for r in ran):.3f}s" if ran else ""))
     if args.json:
+        os.makedirs(os.path.dirname(os.path.abspath(args.json)), exist_ok=True)
         with open(args.json, "w") as f:
-            json.dump({"binary": args.binary, "subcommand": args.subcommand, "timeout": args.timeout,
-                       "results": results}, f, indent=1)
+            json.dump({"binary": args.binary, "subcommand": args.subcommand,
+                       "timeout": args.timeout, "benchmark": args.benchmark,
+                       "jobs": args.jobs, "results": results}, f, indent=1)
     sys.exit(1 if fails else 0)
 
 
