@@ -30,7 +30,7 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 | 1 | Core CDCL: clause arena, 2WL with blocking literal, trail + trail_lim, level-0 units, 1-UIP analysis, backjumping, learned-clause attach, text DRAT writer; dev-build invariant "no unit/falsified clause after propagate"; propagate CI canary | uf100 < 1 s, uuf100 < 5 s, uuf250 < 10 s each; `hole8` finishes; every UNSAT `drat-trim` verified; fuzz clean | [x] (uuf250 miss addressed by milestones 2–3) |
 | 2 | VSIDS heap, phase saving, Luby restarts | uf250 each < 1 s; flat200 each < 1 s; ≤ 2× MiniSat solved-count on 50 mixed instances | [x] (absolute uf250 target misses; comparison target passes) |
 | 3 | Recursive clause minimisation, LBD, reduceDB with tiers, arena GC, watch-pool rebuild with slack, level-0 simplify | ≥ 25 % fewer learned literals on uuf250; 30-min run keeps arena ≤ 1.2× live and RSS bounded; proofs still verify | [x] |
-| 4 | Library API: assumptions, incremental clause adding, `final_conflict`, IPASIR-shaped surface; CLI becomes a thin client of it | 10 000 random incremental cases agree with one-shot solve (PySAT differential); cores genuinely infeasible | [ ] |
+| 4 | Library API: assumptions, incremental clause adding, `final_conflict`, IPASIR-shaped surface; CLI becomes a thin client of it | 10 000 random incremental cases agree with one-shot solve (PySAT differential); cores genuinely infeasible | [x] |
 | 5+ | Later list: binary DRAT, binary-clause inline watchers, glue-EMA + stable/focused restarts, VMTF, trail reuse, saved watch position, chronological backtracking, preprocessing | each measured on the nightly suite | [ ] |
 
 ## Phase 2 — infrastructure (grows alongside)
@@ -47,10 +47,10 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 
 - The pinned compiler remains `nightly-2026-08-18-e9be50a`. Keep the list-threaded hot APIs until
   issue roc#10848 is fixed and a canary confirms record threading is safe.
-- Milestones 2 and 3 are complete: deterministic EVSIDS, full phase saving, Luby restarts,
-  recursive minimization, LBD/use tiers, reduceDB, compacting arena GC, watch rebuilds, and
-  level-0 simplification. The next solver task is milestone 4's assumptions/incremental library
-  API; check `plans/simplify-backlog.md` before touching `Core`.
+- Milestones 2–4 are complete. `Rocsat` now provides signed literals, dynamic variables,
+  incremental clause addition, assumptions, SAT inspection, phase control, and failed-assumption
+  conflicts over the existing deterministic EVSIDS/Luby/lifecycle engine. The next solver work is
+  selected from milestone 5+; check `plans/simplify-backlog.md` before touching `Core`.
 - Serial 1-second SATLIB counts on the final host are rocsat 57/100 uf250, 8/100 uuf250, and
   100/100 flat200, versus MiniSat 82/100, 13/100, and 100/100. The roadmap's absolute all-uf250
   target was unrealistic on this host, but the relative solved-count target passes.
@@ -69,3 +69,7 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 - 2026-08-19 — milestone 3 complete: recursive minimization removes 27.7% of derived literals on
   the fixed uuf250 sample (44.5% versus a non-minimizing build); tiered reduction, one-sixth-waste
   arena GC, watch rebuilds, and root simplification keep storage bounded with verified DRAT proofs.
+- 2026-08-19 — milestone 4 complete: the signed-literal `Rocsat` facade supports dynamic variables,
+  clauses between calls, assumptions, models/values, phase control, and final conflicts. A
+  10,000-query differential across 1,000 persistent sessions matched fresh PySAT; every SAT model
+  and independently re-solved failed core passed.

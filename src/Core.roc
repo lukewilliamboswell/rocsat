@@ -8,9 +8,10 @@
 # `[blocker, cref]` at `pool[wofs..]`, relocated to the end of the pool with doubled capacity when
 # full; `pool[0]` is reserved so `wofs = 0` means no block yet.
 #
-# `trail`, `trail_lim`, and the variable heap are fixed-capacity buffers (one slot per variable)
-# with explicit live lengths. This keeps the established hot loops on indexed writes; an earlier
-# claim that truncating a list poisons uniqueness no longer reproduces on the pinned compiler.
+# `trail` and the variable heap are fixed-capacity buffers (one slot per variable) with explicit
+# live lengths. `trail_lim` starts at that capacity and grows at the cold solve boundary when dummy
+# assumption levels require more slots. This keeps the established hot loops on indexed writes; an
+# earlier claim that truncating a list poisons uniqueness no longer reproduces on the pinned compiler.
 #
 # The `State` record exists at the API boundary only. Every function that mutates takes the
 # lists it needs as separate parameters and returns them in a tuple, and the owner loops

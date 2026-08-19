@@ -3,7 +3,7 @@
 # and full phase saving, with Luby restarts, recursive learned-clause minimisation, LBD tiers,
 # learned-clause reduction, watch rebuilds, and compacting arena collection.
 #
-# `add_all` and `search` are the owner loops: they hold the unpacked state in `var`s and apply
+# `add_all` and `search_loop` are the owner loops: they hold the unpacked state in `var`s and apply
 # one list-level step per statement (see the shape rule in Core); `add_clauses` and `solve`
 # normalize, unpack, and repack the record around them.
 
