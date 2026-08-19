@@ -33,7 +33,7 @@ class CorpusFetchTests(unittest.TestCase):
             source.write_bytes(blob)
             entry = {
                 "set": "tiny", "family": "test", "profiles": ["unit"], "files": 1,
-                "url": source.as_uri(), "sha256": hashlib.sha256(blob).hexdigest(),
+                "url": source.as_uri(), "sha256": hashlib.sha256(blob).hexdigest(), "bytes": 14,
             }
             state, _ = fetch.fetch_archive(entry, root / "corpus", 1000)
             self.assertEqual(state, "fetched")
@@ -60,7 +60,7 @@ class CorpusFetchTests(unittest.TestCase):
             entry = {
                 "set": "competition", "name": "x.cnf", "family": "test",
                 "profiles": ["binary"], "status": "SAT", "source": "unit",
-                "url": source.as_uri(), "sha256": hashlib.sha256(data).hexdigest(),
+                "url": source.as_uri(), "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data),
             }
             state, _ = fetch.fetch_instance(entry, root / "corpus", 1000)
             self.assertEqual(state, "fetched")
@@ -68,6 +68,18 @@ class CorpusFetchTests(unittest.TestCase):
             entry["sha256"] = "0" * 64
             with self.assertRaisesRegex(ValueError, "hash mismatch"):
                 fetch.fetch_instance(entry, root / "corpus", 1000, force=True)
+
+    def test_committed_competition_statuses_match_unique_manifest_families(self):
+        manifest = fetch.load_manifest(Path(__file__).with_name("corpus.toml"))
+        instances = manifest["instance"]
+        self.assertEqual(len(instances), 81)
+        self.assertEqual(len({entry["family"] for entry in instances}), 81)
+        expected = {}
+        with open(Path(__file__).with_name("expected") / "competition-2025.tsv") as source:
+            for line in source:
+                name, status = line.rstrip().split("\t")
+                expected[name] = status
+        self.assertEqual(expected, {entry["name"]: entry["status"] for entry in instances})
 
     def test_manifest_rejects_unsafe_names_and_one_gigabyte_budget(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -84,6 +96,7 @@ profiles=['x']
 url='file:///x'
 sha256='0000000000000000000000000000000000000000000000000000000000000000'
 files=1
+bytes=1
 """)
             with self.assertRaisesRegex(ValueError, "unsafe set"):
                 fetch.load_manifest(path)
@@ -109,6 +122,18 @@ p cnf 9 5
             self.assertEqual([got[x] for x in ("empty", "unit", "binary", "ternary", "long")],
                              [1, 1, 1, 1, 1])
             self.assertEqual(got["maximum_clause"], 5)
+
+    def test_summary_aggregates_shape_loads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = Path(tmp) / "a.cnf"
+            second = Path(tmp) / "b.cnf"
+            first.write_text("p cnf 2 1\n1 2 0\n")
+            second.write_text("p cnf 3 1\n1 2 3 0\n")
+            got = cnf_profile.summarize([first, second])
+            self.assertEqual(got["instances"], 2)
+            self.assertEqual(got["binary"], 1)
+            self.assertEqual(got["ternary"], 1)
+            self.assertEqual(got["variables_max"], 3)
 
     def test_unterminated_clause_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

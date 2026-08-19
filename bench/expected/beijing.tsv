@@ -1,0 +1,16 @@
+2bitadd_10.cnf	UNSAT
+2bitadd_11.cnf	SAT
+2bitadd_12.cnf	SAT
+2bitcomp_5.cnf	SAT
+2bitmax_6.cnf	SAT
+3bitadd_31.cnf	SAT
+3bitadd_32.cnf	SAT
+3blocks.cnf	SAT
+4blocks.cnf	SAT
+4blocksb.cnf	SAT
+e0ddr2-10-by-5-1.cnf	SAT
+e0ddr2-10-by-5-4.cnf	SAT
+enddr2-10-by-5-1.cnf	SAT
+enddr2-10-by-5-8.cnf	SAT
+ewddr2-10-by-5-1.cnf	SAT
+ewddr2-10-by-5-8.cnf	SAT

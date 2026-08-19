@@ -8,6 +8,7 @@ profiles = ["ternary", "sat"]
 url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uf20-91.tar.gz"
 sha256 = "be2835295e8500bb28f0314eba70bd0deaff1250b187260f7b6d0772bdf111a5"
 files = 1000
+bytes = 1147118
 
 [[archive]]
 set = "uf50-218"
@@ -16,6 +17,7 @@ profiles = ["ternary", "sat"]
 url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uf50-218.tar.gz"
 sha256 = "a40862e52dfdce78620b037254579a02dbda8182d2879433658a4c15cb00327c"
 files = 1000
+bytes = 2741217
 
 [[archive]]
 set = "uuf50-218"
@@ -24,6 +26,7 @@ profiles = ["ternary", "unsat"]
 url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uuf50-218.tar.gz"
 sha256 = "24cc9f492673e0f975fecc56b3a4d8ac21c385cc46205d83b7491a787f43e13d"
 files = 1000
+bytes = 2740477
 
 [[archive]]
 set = "uf100-430"
@@ -32,6 +35,7 @@ profiles = ["ternary", "sat"]
 url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uf100-430.tar.gz"
 sha256 = "7f691acb8c45790ef8178dd01bb362cf50da608d478be9965599131f0a763e59"
 files = 1000
+bytes = 5406107
 
 [[archive]]
 set = "uuf100-430"
@@ -40,6 +44,7 @@ profiles = ["ternary", "unsat"]
 url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uuf100-430.tar.gz"
 sha256 = "736c6f94fecae346a00501b197c482e146b1c6ab05fb6d2e4666e520b8e8508a"
 files = 1000
+bytes = 5405831
 
 [[archive]]
 set = "uf250-1065"
@@ -48,6 +53,7 @@ profiles = ["ternary", "conflict", "sat"]
 url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uf250-1065.tar.gz"
 sha256 = "ebe9b90d674bfd4d3cc76ed048f144e2728b1758cb8aac157c7ce38bb1d1931d"
 files = 100
+bytes = 1525437
 
 [[archive]]
 set = "uuf250-1065"
@@ -56,6 +62,7 @@ profiles = ["ternary", "conflict", "unsat"]
 url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uuf250-1065.tar.gz"
 sha256 = "1b6d59619e3c805947c5602703ff3190dfbfeff55d6cb62187838668b0fd4126"
 files = 100
+bytes = 1526259
 
 [[archive]]
 set = "flat200-479"
@@ -64,6 +71,7 @@ profiles = ["combinatorial", "sat"]
 url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/GCP/flat200-479.tar.gz"
 sha256 = "a27f57132377dc6be4fd11a938c78e6ec245e65fb33fa7a86579ef986c7c242b"
 files = 100
+bytes = 2701348
 
 [[archive]]
 set = "hole"
@@ -72,6 +80,7 @@ profiles = ["crafted", "conflict", "unsat-proof"]
 url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/PHOLE/pigeon-hole.tar.gz"
 sha256 = "092c4682d1a9d25451e8661af0afa3635943173b07164db495f4f0e11e806ee0"
 files = 5
+bytes = 24885
 
 [[archive]]
 set = "dubois"
@@ -80,6 +89,7 @@ profiles = ["crafted", "conflict", "unsat-proof"]
 url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/DUBOIS/dubois.tar.gz"
 sha256 = "c0ffe431d4b3fc69226f5f5e0444068d5619642f18f8e4f8c8023c24c9ef263c"
 files = 13
+bytes = 54249
 
 [[archive]]
 set = "pret"
@@ -88,6 +98,7 @@ profiles = ["crafted", "unsat-proof"]
 url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/PRET/pret.tar.gz"
 sha256 = "22719743d775f844c73d51b5255c6945ac77c86b6e9205aa718d714ce0006ef2"
 files = 8
+bytes = 63988
 
 [[archive]]
 set = "aim"
@@ -96,3 +107,1086 @@ profiles = ["crafted", "sat-unsat"]
 url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/AIM/aim.tar.gz"
 sha256 = "7e4e0076fdd840ed7bcc80c475509ed7726608b010cd3f181d503fe337473c85"
 files = 72
+bytes = 326944
+
+# Small structured SATLIB families. These add application diversity without material disk cost.
+[[archive]]
+set = "planning-blocksworld"
+family = "planning"
+profiles = ["planning", "mixed-clauses"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/PLANNING/BlocksWorld/blocksworld.tar.gz"
+sha256 = "f1f2e630f84975857bec6661a459e3bf1220de857fe3b487bcfe1ef8a93ac3a2"
+files = 7
+bytes = 3020977
+
+[[archive]]
+set = "planning-logistics"
+family = "planning"
+profiles = ["planning", "mixed-clauses", "sat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/PLANNING/Logistics/logistics.tar.gz"
+sha256 = "dcd3b7abfcf25ddf264d46b6ed95ec597eefcdcad88659877812a427c1c576af"
+files = 4
+bytes = 672923
+
+[[archive]]
+set = "quasigroup"
+family = "quasigroup-completion"
+profiles = ["csp", "combinatorial"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/QG/QG.tar.gz"
+sha256 = "6b8153ace76d0c0f042ce061360ebd40cdf67429b1477ffbdac631c2e9cc4207"
+files = 22
+bytes = 21943002
+
+[[archive]]
+set = "bmc"
+family = "bounded-model-checking"
+profiles = ["hardware", "binary", "propagation"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/BMC/bmc.tar.gz"
+sha256 = "5bda83de61aaa4f7fca7123b259c5d3fc0d6dfe8a22afdf3f09c7530ba3f5330"
+files = 13
+bytes = 37903642
+
+[[archive]]
+set = "jnh"
+family = "variable-length-random"
+profiles = ["random", "mixed-clauses"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/JNH/jnh.tar.gz"
+sha256 = "f2c41a8f11b017649de32ac7ffa377be8e5cc18d1c8601147ece713a9446d3cc"
+files = 50
+bytes = 1177435
+
+[[archive]]
+set = "parity"
+family = "parity-learning"
+profiles = ["xor-parity", "sat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/PARITY/parity.tar.gz"
+sha256 = "d18ef13699ec3aafe0e70861fc1b9316205a6264c818cf2f69ebf3478534ba4f"
+files = 30
+bytes = 1895091
+
+[[archive]]
+set = "ssa"
+family = "circuit-fault-analysis"
+profiles = ["hardware", "binary", "sat-unsat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/SSA/ssa.tar.gz"
+sha256 = "cea3458ff3dcdd757a7997c72da0ab97852cd94aa9fd2ca133262932a68b9b5f"
+files = 8
+bytes = 792907
+
+[[archive]]
+set = "bf"
+family = "circuit-fault-analysis"
+profiles = ["hardware", "binary"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/BF/bf.tar.gz"
+sha256 = "8a100ce6753ec4da9068f3915e63b7b95719c468c46cd78b0c9140d7acda5b4d"
+files = 4
+bytes = 294897
+
+[[archive]]
+set = "hanoi"
+family = "hanoi-planning"
+profiles = ["planning", "crafted"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/HANOI/hanoi.tar.gz"
+sha256 = "bc025d53024d946c0265afa6906d6b4b30145f1f449ea1d0b12597c0e8d75ac9"
+files = 2
+bytes = 280678
+
+[[archive]]
+set = "inductive-inference"
+family = "inductive-inference"
+profiles = ["learning", "mixed-clauses"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/II/inductive-inference.tar.gz"
+sha256 = "862f8d1b23e062161f7cc630b4c835f0c851c19b97ef6563674c0cae2bb32f52"
+files = 41
+bytes = 6462122
+
+[[archive]]
+set = "beijing"
+family = "beijing-challenge"
+profiles = ["crafted", "mixed-clauses"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/Bejing/Bejing.tar.gz"
+sha256 = "35b11e7b76a85245184eb7763ace8e21cacabbfda19892197b0522a16efeccd7"
+files = 16
+bytes = 14890214
+
+[[archive]]
+set = "ais"
+family = "ais"
+profiles = ["crafted", "sat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/AIS/ais.tar.gz"
+sha256 = "b0b13d9ffd5c645ade40c9e5293ab5522ca57a09f198f0700acec9b71b4b4659"
+files = 4
+bytes = 128805
+
+# One compact, known-result representative per SAT Competition 2025 family.
+[[instance]]
+set = "competition-2025"
+name = "1a92907c-algorithm-equivalence-checking.cnf"
+family = "algorithm-equivalence-checking"
+profiles = ["competition-2025", "unsat", "hardware", "software"]
+status = "UNSAT"
+source = "gbd-main-2025:1a92907cdec0528583a8f49a818b406d"
+url = "https://benchmark-database.de/file/1a92907cdec0528583a8f49a818b406d"
+sha256 = "d1adcacd7bab7a4ae25eb91986b0733c0a72d40271b697a7074eb75e594ace94"
+compressed_bytes = 30096
+bytes = 178261
+
+[[instance]]
+set = "competition-2025"
+name = "ac51df6b-argumentation.cnf"
+family = "argumentation"
+profiles = ["competition-2025", "sat", "industrial"]
+status = "SAT"
+source = "gbd-main-2025:ac51df6b340190cd1182c06ff2955afa"
+url = "https://benchmark-database.de/file/ac51df6b340190cd1182c06ff2955afa"
+sha256 = "53759ee4ecbba6d140f954e162e638cf24fdfe2c26f2e5f01172364c99bf775f"
+compressed_bytes = 30660
+bytes = 161935
+
+[[instance]]
+set = "competition-2025"
+name = "4ba2c1aa-at-least-two-sol.cnf"
+family = "at-least-two-sol"
+profiles = ["competition-2025", "sat", "industrial"]
+status = "SAT"
+source = "gbd-main-2025:4ba2c1aa580b6497df6baf5e7e2c87be"
+url = "https://benchmark-database.de/file/4ba2c1aa580b6497df6baf5e7e2c87be"
+sha256 = "5fac52ea0215c0ce7637891284954fe1b083b55f031de6696cf490d66aec4e4e"
+compressed_bytes = 314252
+bytes = 3354864
+
+[[instance]]
+set = "competition-2025"
+name = "ed6d842f-battleship.cnf"
+family = "battleship"
+profiles = ["competition-2025", "sat", "puzzle-csp"]
+status = "SAT"
+source = "gbd-main-2025:ed6d842f96d10f3400bce251f9e95bfb"
+url = "https://benchmark-database.de/file/ed6d842f96d10f3400bce251f9e95bfb"
+sha256 = "9d586fde48ebcc533f867c06569f008a9b3f5b71dca6a3c9e18db48e037a0b6f"
+compressed_bytes = 7808
+bytes = 73563
+
+[[instance]]
+set = "competition-2025"
+name = "5c24cfef-belpyramid-puzzle.cnf"
+family = "belpyramid-puzzle"
+profiles = ["competition-2025", "unsat", "puzzle-csp"]
+status = "UNSAT"
+source = "gbd-main-2025:5c24cfeff639fefdead9a5641f65fa22"
+url = "https://benchmark-database.de/file/5c24cfeff639fefdead9a5641f65fa22"
+sha256 = "ca3b6feb22f778d4519f3da8dfb1c5989a69187e2a6c04e696005977b3c1458b"
+compressed_bytes = 31088
+bytes = 156408
+
+[[instance]]
+set = "competition-2025"
+name = "9b5f767e-bitvector.cnf"
+family = "bitvector"
+profiles = ["competition-2025", "unsat", "hardware"]
+status = "UNSAT"
+source = "gbd-main-2025:9b5f767eb5c14eb888d51acf70e045c8"
+url = "https://benchmark-database.de/file/9b5f767eb5c14eb888d51acf70e045c8"
+sha256 = "bc3cf193d19ba1c5d0f5757de7630a3482a4301dacea7bf8a699e9e5e6c0b124"
+compressed_bytes = 89124
+bytes = 548895
+
+[[instance]]
+set = "competition-2025"
+name = "18d41243-cellular-automata.cnf"
+family = "cellular-automata"
+profiles = ["competition-2025", "unsat", "industrial"]
+status = "UNSAT"
+source = "gbd-main-2025:18d4124324b56e434118f9ef72198d84"
+url = "https://benchmark-database.de/file/18d4124324b56e434118f9ef72198d84"
+sha256 = "cbd8ed18b0b0e90f90243e594f546f2cfee2df88add5e7532074b2f7f8bdc36e"
+compressed_bytes = 7489328
+bytes = 69493970
+
+[[instance]]
+set = "competition-2025"
+name = "f0bafebd-circuit-equivalence-checking.cnf"
+family = "circuit-equivalence-checking"
+profiles = ["competition-2025", "unsat", "hardware"]
+status = "UNSAT"
+source = "gbd-main-2025:f0bafebdcce23ccfbaf6c27a7522069b"
+url = "https://benchmark-database.de/file/f0bafebdcce23ccfbaf6c27a7522069b"
+sha256 = "5015bd457b93d37e8a4f899510d6e81bd8f2208c07370b82166a62cc3164bc4a"
+compressed_bytes = 41716
+bytes = 205931
+
+[[instance]]
+set = "competition-2025"
+name = "9ea8deb8-circuit-multiplier.cnf"
+family = "circuit-multiplier"
+profiles = ["competition-2025", "sat", "hardware"]
+status = "SAT"
+source = "gbd-main-2025:9ea8deb8313d93e60743638909f37d6c"
+url = "https://benchmark-database.de/file/9ea8deb8313d93e60743638909f37d6c"
+sha256 = "a04170aa49ccc2e9fc352a23da0c56cbf6064874d407cb2596544caab8127517"
+compressed_bytes = 149320
+bytes = 668456
+
+[[instance]]
+set = "competition-2025"
+name = "6d35bab4-clustered-random.cnf"
+family = "clustered-random"
+profiles = ["competition-2025", "unsat", "crafted"]
+status = "UNSAT"
+source = "gbd-main-2025:6d35bab4302bc221fa2c9234547b848b"
+url = "https://benchmark-database.de/file/6d35bab4302bc221fa2c9234547b848b"
+sha256 = "b2204a649dc3e6d87980e72a325cb3bcb5cf7e32b947be1bda8a6e957983c235"
+compressed_bytes = 52992
+bytes = 150664
+
+[[instance]]
+set = "competition-2025"
+name = "292bedf6-coloring-clique.cnf"
+family = "coloring-clique"
+profiles = ["competition-2025", "unsat", "graph"]
+status = "UNSAT"
+source = "gbd-main-2025:292bedf65cee7cc38fe8b2725eb50868"
+url = "https://benchmark-database.de/file/292bedf65cee7cc38fe8b2725eb50868"
+sha256 = "b38a0161e666b101d04db08a7d8791002a80eb809c3fea69bef30fdbef9b2009"
+compressed_bytes = 12204
+bytes = 227002
+
+[[instance]]
+set = "competition-2025"
+name = "482295be-coloring-mycielski-graph.cnf"
+family = "coloring-mycielski-graph"
+profiles = ["competition-2025", "unsat", "graph"]
+status = "UNSAT"
+source = "gbd-main-2025:482295be38dc1d63a16f3cf649ef7ef6"
+url = "https://benchmark-database.de/file/482295be38dc1d63a16f3cf649ef7ef6"
+sha256 = "037437a45e05435c08e62d0df2f872099cda4b928d048406694b595c45a90ff1"
+compressed_bytes = 19348
+bytes = 149976
+
+[[instance]]
+set = "competition-2025"
+name = "e7addace-crafted-cec.cnf"
+family = "crafted-cec"
+profiles = ["competition-2025", "sat", "crafted"]
+status = "SAT"
+source = "gbd-main-2025:e7addace716ccd5c16ff9a5650869465"
+url = "https://benchmark-database.de/file/e7addace716ccd5c16ff9a5650869465"
+sha256 = "e6048c5fd865653adaeef9d0659e25411410fc07c9ad012fb7ad502901dc8624"
+compressed_bytes = 164816
+bytes = 862942
+
+[[instance]]
+set = "competition-2025"
+name = "99718c17-cryptography.cnf"
+family = "cryptography"
+profiles = ["competition-2025", "unsat", "graph", "crypto-arithmetic"]
+status = "UNSAT"
+source = "gbd-main-2025:99718c1729a8de3347a9946f1836421d"
+url = "https://benchmark-database.de/file/99718c1729a8de3347a9946f1836421d"
+sha256 = "fbf923ffc448f1283dbdc4d8c1991d95d7baa0768ac83226ac968641ccac2df8"
+compressed_bytes = 14324
+bytes = 109311
+
+[[instance]]
+set = "competition-2025"
+name = "f33a6163-cryptography-simon.cnf"
+family = "cryptography-simon"
+profiles = ["competition-2025", "sat", "graph", "crypto-arithmetic"]
+status = "SAT"
+source = "gbd-main-2025:f33a6163305d6559043b7438a692dea9"
+url = "https://benchmark-database.de/file/f33a6163305d6559043b7438a692dea9"
+sha256 = "e94c361a7243b2d347f8eee71c99506bad05fa7717077df5cb2bf84807026259"
+compressed_bytes = 16484
+bytes = 147991
+
+[[instance]]
+set = "competition-2025"
+name = "24075575-diagnosis.cnf"
+family = "diagnosis"
+profiles = ["competition-2025", "unsat", "industrial"]
+status = "UNSAT"
+source = "gbd-main-2025:24075575c3dbd9e9eae948dd2241b029"
+url = "https://benchmark-database.de/file/24075575c3dbd9e9eae948dd2241b029"
+sha256 = "c7efe956da0bbc3ad64312647eaa7a414004f79f5d02155a05315f54baa94511"
+compressed_bytes = 1190420
+bytes = 18951334
+
+[[instance]]
+set = "competition-2025"
+name = "0ae917c2-discrete-logarithm.cnf"
+family = "discrete-logarithm"
+profiles = ["competition-2025", "sat", "crypto-arithmetic"]
+status = "SAT"
+source = "gbd-main-2025:0ae917c2e0c1d39cbe411c29b2f5ff08"
+url = "https://benchmark-database.de/file/0ae917c2e0c1d39cbe411c29b2f5ff08"
+sha256 = "5543dd604cf80ee9f1052fa7014ac370536aba152f43c9a2895a3f80535c2e5d"
+compressed_bytes = 256040
+bytes = 2640798
+
+[[instance]]
+set = "competition-2025"
+name = "64cb3656-edge-matching.cnf"
+family = "edge-matching"
+profiles = ["competition-2025", "sat", "puzzle-csp"]
+status = "SAT"
+source = "gbd-main-2025:64cb3656e0c03b3db7033ee9b987f280"
+url = "https://benchmark-database.de/file/64cb3656e0c03b3db7033ee9b987f280"
+sha256 = "551206838a2538751ad9f2ee772daafd68ba583a24f80a91bc811c569f760e00"
+compressed_bytes = 52008
+bytes = 442762
+
+[[instance]]
+set = "competition-2025"
+name = "67aa1a25-ensemble-computation.cnf"
+family = "ensemble-computation"
+profiles = ["competition-2025", "sat", "industrial"]
+status = "SAT"
+source = "gbd-main-2025:67aa1a256f92020dccdf66b235de3986"
+url = "https://benchmark-database.de/file/67aa1a256f92020dccdf66b235de3986"
+sha256 = "8ad4576ce039ec124baef313cec7789f1d234ec93bc372f3d016731be74723d7"
+compressed_bytes = 134216
+bytes = 1326903
+
+[[instance]]
+set = "competition-2025"
+name = "f626408e-equivalence-checking.cnf"
+family = "equivalence-checking"
+profiles = ["competition-2025", "unsat", "hardware"]
+status = "UNSAT"
+source = "gbd-main-2025:f626408ec204fd8e1a7924d0e59672e9"
+url = "https://benchmark-database.de/file/f626408ec204fd8e1a7924d0e59672e9"
+sha256 = "da537c59532ee0cd1b42eaf937861be58c3d3a6de14e2151c98182226538697c"
+compressed_bytes = 4251668
+bytes = 31070594
+
+[[instance]]
+set = "competition-2025"
+name = "9dcbf221-erdos-discrepancy.cnf"
+family = "erdos-discrepancy"
+profiles = ["competition-2025", "sat", "xor-parity"]
+status = "SAT"
+source = "gbd-main-2025:9dcbf221b8d2bb01f30bcca283f3608d"
+url = "https://benchmark-database.de/file/9dcbf221b8d2bb01f30bcca283f3608d"
+sha256 = "b34a5eb5648c869292f956733bd3fe26550456e7ead96da55d00bc188c69c557"
+compressed_bytes = 1651328
+bytes = 13615867
+
+[[instance]]
+set = "competition-2025"
+name = "e207ba2d-fermat.cnf"
+family = "fermat"
+profiles = ["competition-2025", "sat", "crypto-arithmetic"]
+status = "SAT"
+source = "gbd-main-2025:e207ba2df64495327f715e08155a220f"
+url = "https://benchmark-database.de/file/e207ba2df64495327f715e08155a220f"
+sha256 = "821c3de4a3f7af4edb8fd94235a2940a8b642c004c8204bb8bebffdf3aee19dc"
+compressed_bytes = 135204
+bytes = 1407579
+
+[[instance]]
+set = "competition-2025"
+name = "4c3001f8-fixed-shape-random.cnf"
+family = "fixed-shape-random"
+profiles = ["competition-2025", "sat", "crafted"]
+status = "SAT"
+source = "gbd-main-2025:4c3001f8073986116d98084dde70da05"
+url = "https://benchmark-database.de/file/4c3001f8073986116d98084dde70da05"
+sha256 = "ad1eebb4875bad02ddfa87baed319b51d91559fa93b4d26993ac4db0a0d5d832"
+compressed_bytes = 47528
+bytes = 156855
+
+[[instance]]
+set = "competition-2025"
+name = "1890f49a-fpga-routing.cnf"
+family = "fpga-routing"
+profiles = ["competition-2025", "unsat", "hardware"]
+status = "UNSAT"
+source = "gbd-main-2025:1890f49a43a94b97828528b68c32b78e"
+url = "https://benchmark-database.de/file/1890f49a43a94b97828528b68c32b78e"
+sha256 = "74c4889146ed0f5397665500ac03893196208843e8169a5e8d9ef8c7ba0ad4d3"
+compressed_bytes = 4140
+bytes = 11880
+
+[[instance]]
+set = "competition-2025"
+name = "36ba44cf-generic-csp.cnf"
+family = "generic-csp"
+profiles = ["competition-2025", "sat", "puzzle-csp"]
+status = "SAT"
+source = "gbd-main-2025:36ba44cf208034e2c8e84a1971b9bfd4"
+url = "https://benchmark-database.de/file/36ba44cf208034e2c8e84a1971b9bfd4"
+sha256 = "fb9b1c87561d5abec31c478ecbd58eab2085d85fb01e2008267620ca7f49dff9"
+compressed_bytes = 69424
+bytes = 208052
+
+[[instance]]
+set = "competition-2025"
+name = "3f67f676-grandtour-puzzle.cnf"
+family = "grandtour-puzzle"
+profiles = ["competition-2025", "unsat", "puzzle-csp"]
+status = "UNSAT"
+source = "gbd-main-2025:3f67f6767764855e516e5394be1145e5"
+url = "https://benchmark-database.de/file/3f67f6767764855e516e5394be1145e5"
+sha256 = "21137d85fa8ae64830504ba3bd15ddc5dbffd806d55c225a86547d0a5d09e968"
+compressed_bytes = 12560
+bytes = 45932
+
+[[instance]]
+set = "competition-2025"
+name = "43687a48-gray_codes.cnf"
+family = "gray_codes"
+profiles = ["competition-2025", "unsat", "industrial"]
+status = "UNSAT"
+source = "gbd-main-2025:43687a48fb119ca61b47c2fc69a71e7d"
+url = "https://benchmark-database.de/file/43687a48fb119ca61b47c2fc69a71e7d"
+sha256 = "f21abe672501abe130d5c5b9dcb984d170eb724734677e073af3b65d21f67f45"
+compressed_bytes = 91920
+bytes = 1129517
+
+[[instance]]
+set = "competition-2025"
+name = "3ef7fa06-grs-fp-comm.cnf"
+family = "grs-fp-comm"
+profiles = ["competition-2025", "unsat", "industrial"]
+status = "UNSAT"
+source = "gbd-main-2025:3ef7fa06c6380f12cfe2970873da6fb1"
+url = "https://benchmark-database.de/file/3ef7fa06c6380f12cfe2970873da6fb1"
+sha256 = "96ed68efd2f07b669b29416705660884b3f5223814729423d7a77b203f04d1b2"
+compressed_bytes = 507540
+bytes = 4918989
+
+[[instance]]
+set = "competition-2025"
+name = "6e139783-hamiltonian.cnf"
+family = "hamiltonian"
+profiles = ["competition-2025", "sat", "graph"]
+status = "SAT"
+source = "gbd-main-2025:6e139783cfbcfeec85b49750ad11a615"
+url = "https://benchmark-database.de/file/6e139783cfbcfeec85b49750ad11a615"
+sha256 = "89cd0d3be21de667864f6c2d63637431f65f19defa9ce0d1233334ab826bb505"
+compressed_bytes = 5668
+bytes = 32507
+
+[[instance]]
+set = "competition-2025"
+name = "334aa882-hamiltonian-cycle.cnf"
+family = "hamiltonian-cycle"
+profiles = ["competition-2025", "sat", "graph"]
+status = "SAT"
+source = "gbd-main-2025:334aa882de28856fc8c75885285d2a3c"
+url = "https://benchmark-database.de/file/334aa882de28856fc8c75885285d2a3c"
+sha256 = "bea38a58bbae66f071a82e4140a23df3bc37b41904085e66e5fd53f78aaa2892"
+compressed_bytes = 552044
+bytes = 5723473
+
+[[instance]]
+set = "competition-2025"
+name = "546f8e06-hardware-model-checking.cnf"
+family = "hardware-model-checking"
+profiles = ["competition-2025", "sat", "hardware"]
+status = "SAT"
+source = "gbd-main-2025:546f8e069aa450002a30c9c47538fe95"
+url = "https://benchmark-database.de/file/546f8e069aa450002a30c9c47538fe95"
+sha256 = "2d3166f230aeb1d6de65b4d8edf4bde8ec88dbf6c913a41e2048ac1d26e3f6c4"
+compressed_bytes = 1498420
+bytes = 9701065
+
+[[instance]]
+set = "competition-2025"
+name = "2d0c041c-hgen.cnf"
+family = "hgen"
+profiles = ["competition-2025", "sat", "crafted"]
+status = "SAT"
+source = "gbd-main-2025:2d0c041c0fe72dc32527bfbf34f63e61"
+url = "https://benchmark-database.de/file/2d0c041c0fe72dc32527bfbf34f63e61"
+sha256 = "b15bdf2acd29a6a149b96135c7d098e375600370ef63eefc22cdbe43b7d8eaa1"
+compressed_bytes = 6236
+bytes = 16364
+
+[[instance]]
+set = "competition-2025"
+name = "6147e666-hidoku.cnf"
+family = "hidoku"
+profiles = ["competition-2025", "unsat", "puzzle-csp"]
+status = "UNSAT"
+source = "gbd-main-2025:6147e666b75f603a4c4490d21ab654cd"
+url = "https://benchmark-database.de/file/6147e666b75f603a4c4490d21ab654cd"
+sha256 = "48a53fcd6429e09965b58a71e609440c140682bc233226179bbefea4afab09b7"
+compressed_bytes = 17636
+bytes = 133428
+
+[[instance]]
+set = "competition-2025"
+name = "2bdfcf23-independent-set.cnf"
+family = "independent-set"
+profiles = ["competition-2025", "unsat", "graph"]
+status = "UNSAT"
+source = "gbd-main-2025:2bdfcf23ac1829912a408402a540972a"
+url = "https://benchmark-database.de/file/2bdfcf23ac1829912a408402a540972a"
+sha256 = "dfdb799f9ee5aa511aed952c9e1c4fc32af8da1667542017d4202ef8e414cf0c"
+compressed_bytes = 223860
+bytes = 6924856
+
+[[instance]]
+set = "competition-2025"
+name = "27570c67-independent-set-reconfiguration.cnf"
+family = "independent-set-reconfiguration"
+profiles = ["competition-2025", "sat", "graph"]
+status = "SAT"
+source = "gbd-main-2025:27570c6780aaade3dc771c6a12534fb8"
+url = "https://benchmark-database.de/file/27570c6780aaade3dc771c6a12534fb8"
+sha256 = "86bb0a23b63a6a90efda17de902835291595316554e52ed6171dc7df2f22fd30"
+compressed_bytes = 886552
+bytes = 13567854
+
+[[instance]]
+set = "competition-2025"
+name = "f32bb347-influence-maximization.cnf"
+family = "influence-maximization"
+profiles = ["competition-2025", "sat", "industrial"]
+status = "SAT"
+source = "gbd-main-2025:f32bb347996c351bc3e9a91c58e8601d"
+url = "https://benchmark-database.de/file/f32bb347996c351bc3e9a91c58e8601d"
+sha256 = "d9a175de15fb7e0315c7e6115b2430166b3e376c3db9b61356550f3f27f51929"
+compressed_bytes = 224520
+bytes = 2168437
+
+[[instance]]
+set = "competition-2025"
+name = "59825ed9-knights-problem.cnf"
+family = "knights-problem"
+profiles = ["competition-2025", "sat", "industrial"]
+status = "SAT"
+source = "gbd-main-2025:59825ed96dc3bbdbd8789a4870b323ec"
+url = "https://benchmark-database.de/file/59825ed96dc3bbdbd8789a4870b323ec"
+sha256 = "b2c187f8e740554d6efb22ad8b6a575425dfc555525b945a12acd5e0328c5dac"
+compressed_bytes = 2193708
+bytes = 9559330
+
+[[instance]]
+set = "competition-2025"
+name = "86173292-ktf.cnf"
+family = "ktf"
+profiles = ["competition-2025", "sat", "puzzle-csp"]
+status = "SAT"
+source = "gbd-main-2025:86173292a2c6a506acf27a81db853bb5"
+url = "https://benchmark-database.de/file/86173292a2c6a506acf27a81db853bb5"
+sha256 = "a8aea7e4da078513ac5af84fc390d3ab27f8bd26ee7eced9fac2589d18504d1f"
+compressed_bytes = 345996
+bytes = 5555501
+
+[[instance]]
+set = "competition-2025"
+name = "53c21f3e-maximum-constraint-partition.cnf"
+family = "maximum-constraint-partition"
+profiles = ["competition-2025", "sat", "industrial"]
+status = "SAT"
+source = "gbd-main-2025:53c21f3e78f060883026b5a12ba691d8"
+url = "https://benchmark-database.de/file/53c21f3e78f060883026b5a12ba691d8"
+sha256 = "cb0ebf34b5a5e971d8469fb01e2f816dc92f74958437df45ced506221fd72fb3"
+compressed_bytes = 243000
+bytes = 2547977
+
+[[instance]]
+set = "competition-2025"
+name = "dbb42e01-mechanical-master-key.cnf"
+family = "mechanical-master-key"
+profiles = ["competition-2025", "unsat", "industrial"]
+status = "UNSAT"
+source = "gbd-main-2025:dbb42e010bed2259e4e27bc43e4d86c6"
+url = "https://benchmark-database.de/file/dbb42e010bed2259e4e27bc43e4d86c6"
+sha256 = "163e390edd9a4dd010ef36ab7299e62cbb9ee0e1edbbd3f724b14a8d839b951e"
+compressed_bytes = 11356
+bytes = 85307
+
+[[instance]]
+set = "competition-2025"
+name = "0c9bcbc8-minimal-disagreement-parity.cnf"
+family = "minimal-disagreement-parity"
+profiles = ["competition-2025", "sat", "xor-parity"]
+status = "SAT"
+source = "gbd-main-2025:0c9bcbc815cf0f109b7aeef3fbffc42d"
+url = "https://benchmark-database.de/file/0c9bcbc815cf0f109b7aeef3fbffc42d"
+sha256 = "f38752653caf4ba545a1bbb07f8e9ccbc4a99091377ab6762ccfe10e67bc9f4b"
+compressed_bytes = 57468
+bytes = 162107
+
+[[instance]]
+set = "competition-2025"
+name = "c0e828fb-miter.cnf"
+family = "miter"
+profiles = ["competition-2025", "unsat", "hardware"]
+status = "UNSAT"
+source = "gbd-main-2025:c0e828fb967fc4f0935cf06c6a6b1055"
+url = "https://benchmark-database.de/file/c0e828fb967fc4f0935cf06c6a6b1055"
+sha256 = "062e3e1caccde25d126877403d6ff35dd5888dc0cc0552f48cfd1470298f648b"
+compressed_bytes = 19404
+bytes = 104581
+
+[[instance]]
+set = "competition-2025"
+name = "d9320e4d-modcircuits.cnf"
+family = "modcircuits"
+profiles = ["competition-2025", "unsat", "hardware"]
+status = "UNSAT"
+source = "gbd-main-2025:d9320e4dbba0f8bd699085f61a98ff5c"
+url = "https://benchmark-database.de/file/d9320e4dbba0f8bd699085f61a98ff5c"
+sha256 = "003e999f43dbf04562f8e792c46c75f8bd6275df22168fa951648fa8d270721e"
+compressed_bytes = 153804
+bytes = 3320353
+
+[[instance]]
+set = "competition-2025"
+name = "362d153b-multiplier-circuits.cnf"
+family = "multiplier-circuits"
+profiles = ["competition-2025", "sat", "hardware"]
+status = "SAT"
+source = "gbd-main-2025:362d153b4162127bc42796180110f483"
+url = "https://benchmark-database.de/file/362d153b4162127bc42796180110f483"
+sha256 = "907c98ebe3331af203f0f9f67529e6933255cd1b0550ecc7caf9d4cdc35514a0"
+compressed_bytes = 48056
+bytes = 406992
+
+[[instance]]
+set = "competition-2025"
+name = "8e81131a-multiplier-equivalence-checking.cnf"
+family = "multiplier-equivalence-checking"
+profiles = ["competition-2025", "unsat", "hardware"]
+status = "UNSAT"
+source = "gbd-main-2025:8e81131a0c4fbd01e90bb6e20d00c547"
+url = "https://benchmark-database.de/file/8e81131a0c4fbd01e90bb6e20d00c547"
+sha256 = "6fc26ddf6ca6e8abfacc55bfc8f9df3c32b65b5ad25a426c4f76d8a7d1dca408"
+compressed_bytes = 24908
+bytes = 126625
+
+[[instance]]
+set = "competition-2025"
+name = "fbdca334-multiplier-verification.cnf"
+family = "multiplier-verification"
+profiles = ["competition-2025", "unsat", "hardware"]
+status = "UNSAT"
+source = "gbd-main-2025:fbdca334e6985cd2de8718b60695b5f6"
+url = "https://benchmark-database.de/file/fbdca334e6985cd2de8718b60695b5f6"
+sha256 = "ead8eb33c4c9365737c7c8b3580ca8ee9c3a8ae244ddea0d68f361bd63bb93c9"
+compressed_bytes = 212280
+bytes = 1510219
+
+[[instance]]
+set = "competition-2025"
+name = "45742d06-mutilated-chessboard.cnf"
+family = "mutilated-chessboard"
+profiles = ["competition-2025", "unsat", "puzzle-csp"]
+status = "UNSAT"
+source = "gbd-main-2025:45742d067cc851edc1201d8a02586eac"
+url = "https://benchmark-database.de/file/45742d067cc851edc1201d8a02586eac"
+sha256 = "b37e298fb08ca8fc5c41817996daf7308ab259714d82193affc670f61d27245f"
+compressed_bytes = 5432
+bytes = 31950
+
+[[instance]]
+set = "competition-2025"
+name = "efc1b7cc-oddball-weighing.cnf"
+family = "oddball-weighing"
+profiles = ["competition-2025", "unsat", "puzzle-csp"]
+status = "UNSAT"
+source = "gbd-main-2025:efc1b7cc3861df8c2b68ca10399b794e"
+url = "https://benchmark-database.de/file/efc1b7cc3861df8c2b68ca10399b794e"
+sha256 = "7e9d896a8d31789b009b3b5ac6c6938aefe0aaa0990e854279db9211a212303f"
+compressed_bytes = 132740
+bytes = 2113374
+
+[[instance]]
+set = "competition-2025"
+name = "4f4d22ce-ordering-principle-xor.cnf"
+family = "ordering-principle-xor"
+profiles = ["competition-2025", "unsat", "xor-parity", "crafted"]
+status = "UNSAT"
+source = "gbd-main-2025:4f4d22ce7643079412975a662e9363fd"
+url = "https://benchmark-database.de/file/4f4d22ce7643079412975a662e9363fd"
+sha256 = "4d12688b1285558bbcad596251088ec9a858adf6f1cebc6638a05baed095b3ae"
+compressed_bytes = 656736
+bytes = 13289014
+
+[[instance]]
+set = "competition-2025"
+name = "d971241c-p-center.cnf"
+family = "p-center"
+profiles = ["competition-2025", "unsat", "industrial"]
+status = "UNSAT"
+source = "gbd-main-2025:d971241ca861121371d20be1d61c15a3"
+url = "https://benchmark-database.de/file/d971241ca861121371d20be1d61c15a3"
+sha256 = "85dc7984528bcf1c692dbdaa13ed4443bbf549c450fb02cba752e4fb4f502f2a"
+compressed_bytes = 11896
+bytes = 156708
+
+[[instance]]
+set = "competition-2025"
+name = "6f40bd5a-pigeon-hole.cnf"
+family = "pigeon-hole"
+profiles = ["competition-2025", "unsat", "crafted"]
+status = "UNSAT"
+source = "gbd-main-2025:6f40bd5ac85e2a53b392d8f0369e7f1f"
+url = "https://benchmark-database.de/file/6f40bd5ac85e2a53b392d8f0369e7f1f"
+sha256 = "7e3b80732b5c4b69e059effda1a52029c9ace8a534f1298b4f168c7e10e0c656"
+compressed_bytes = 11236
+bytes = 36251
+
+[[instance]]
+set = "competition-2025"
+name = "557d7d4d-polynomial-multiplication.cnf"
+family = "polynomial-multiplication"
+profiles = ["competition-2025", "sat", "crypto-arithmetic"]
+status = "SAT"
+source = "gbd-main-2025:557d7d4db5399188f62bc39598c6d868"
+url = "https://benchmark-database.de/file/557d7d4db5399188f62bc39598c6d868"
+sha256 = "211dd72d53e2840e445032cfbd9c29e2e47edd117f302a4947b72b2ad7b095ce"
+compressed_bytes = 345012
+bytes = 4489927
+
+[[instance]]
+set = "competition-2025"
+name = "d07b7175-purdom-instances.cnf"
+family = "purdom-instances"
+profiles = ["competition-2025", "sat", "crafted"]
+status = "SAT"
+source = "gbd-main-2025:d07b717548b8c9c1477dd7f4a650bdf7"
+url = "https://benchmark-database.de/file/d07b717548b8c9c1477dd7f4a650bdf7"
+sha256 = "831768bce9c38abb4026f9da09a0a5e4068e7ddf87e9c2ef0fb0a45d38f868b9"
+compressed_bytes = 108692
+bytes = 309189
+
+[[instance]]
+set = "competition-2025"
+name = "a2fe3213-puzzle.cnf"
+family = "puzzle"
+profiles = ["competition-2025", "sat", "puzzle-csp"]
+status = "SAT"
+source = "gbd-main-2025:a2fe3213d50b3bc297e3f7606c921128"
+url = "https://benchmark-database.de/file/a2fe3213d50b3bc297e3f7606c921128"
+sha256 = "b799310eac3b954d7a35752fbe588ce8810178df51c9bd9d7d9f825499a1289e"
+compressed_bytes = 346220
+bytes = 17321019
+
+[[instance]]
+set = "competition-2025"
+name = "4c7e09f0-pythagorean-triples.cnf"
+family = "pythagorean-triples"
+profiles = ["competition-2025", "sat", "industrial"]
+status = "SAT"
+source = "gbd-main-2025:4c7e09f077026b9ee3900bfed6825fbb"
+url = "https://benchmark-database.de/file/4c7e09f077026b9ee3900bfed6825fbb"
+sha256 = "c3281118c68629c718aea604f7debd459e3531cce3a4541e19a072a8b435bf0b"
+compressed_bytes = 62960
+bytes = 230157
+
+[[instance]]
+set = "competition-2025"
+name = "1e0d58c7-quasigroup-completion.cnf"
+family = "quasigroup-completion"
+profiles = ["competition-2025", "unsat", "puzzle-csp"]
+status = "UNSAT"
+source = "gbd-main-2025:1e0d58c7e52319b3b17e343ec7ca6de5"
+url = "https://benchmark-database.de/file/1e0d58c7e52319b3b17e343ec7ca6de5"
+sha256 = "a48818f1004e6ce9fd85877dc87e82f7c28e371e55eb9cdb77cbcf8a5015ea23"
+compressed_bytes = 119692
+bytes = 363254
+
+[[instance]]
+set = "competition-2025"
+name = "84995056-random-circuits.cnf"
+family = "random-circuits"
+profiles = ["competition-2025", "sat", "hardware", "crafted"]
+status = "SAT"
+source = "gbd-main-2025:849950561ddce887c78fef773dccfa80"
+url = "https://benchmark-database.de/file/849950561ddce887c78fef773dccfa80"
+sha256 = "1e966f7c7accf8109eaae14b942639da31cb34d786b0bd2d4a2a499ed6121bb9"
+compressed_bytes = 286956
+bytes = 8318128
+
+[[instance]]
+set = "competition-2025"
+name = "9b998be0-random-csp.cnf"
+family = "random-csp"
+profiles = ["competition-2025", "sat", "puzzle-csp", "crafted"]
+status = "SAT"
+source = "gbd-main-2025:9b998be0c639d06988c4902eb125c0b7"
+url = "https://benchmark-database.de/file/9b998be0c639d06988c4902eb125c0b7"
+sha256 = "a864d5f3f6e6a0a41d64f20810a59bdd15c5bc2539e4ea5370015a158d77fa25"
+compressed_bytes = 52876
+bytes = 520983
+
+[[instance]]
+set = "competition-2025"
+name = "b5431f41-random-graph-xorsat.cnf"
+family = "random-graph-xorsat"
+profiles = ["competition-2025", "sat", "graph", "xor-parity", "crafted"]
+status = "SAT"
+source = "gbd-main-2025:b5431f41e3264c64508c30da215c69c6"
+url = "https://benchmark-database.de/file/b5431f41e3264c64508c30da215c69c6"
+sha256 = "f9dcbbbcb2abc290439c21978d04cdc44efffbed9b4e5cdee96dd63856a5a156"
+compressed_bytes = 16816
+bytes = 51267
+
+[[instance]]
+set = "competition-2025"
+name = "59fc779f-random-modularity.cnf"
+family = "random-modularity"
+profiles = ["competition-2025", "sat", "crafted"]
+status = "SAT"
+source = "gbd-main-2025:59fc779feee4390b57502814d424e0d6"
+url = "https://benchmark-database.de/file/59fc779feee4390b57502814d424e0d6"
+sha256 = "39e660f8aea0bfb9d6ff27104f6a0b84854bb9fc77436fff61bcf75a52f9b478"
+compressed_bytes = 53588
+bytes = 154497
+
+[[instance]]
+set = "competition-2025"
+name = "a8608545-rbsat.cnf"
+family = "rbsat"
+profiles = ["competition-2025", "sat", "crafted"]
+status = "SAT"
+source = "gbd-main-2025:a8608545f9ae0462c7426e71a0e3e634"
+url = "https://benchmark-database.de/file/a8608545f9ae0462c7426e71a0e3e634"
+sha256 = "00f51d5059170d838edca17715419c9ff937ae5f22c4c575508d3fd99b4bc7ca"
+compressed_bytes = 101180
+bytes = 726330
+
+[[instance]]
+set = "competition-2025"
+name = "82851650-reg-n.cnf"
+family = "reg-n"
+profiles = ["competition-2025", "unsat", "crafted"]
+status = "UNSAT"
+source = "gbd-main-2025:82851650dea77d44864b3fd8ae387691"
+url = "https://benchmark-database.de/file/82851650dea77d44864b3fd8ae387691"
+sha256 = "975f5b18af757abaac276ffb65d2f01cee1df33e6a38fb4d8efa0d5a835e0484"
+compressed_bytes = 375688
+bytes = 10037198
+
+[[instance]]
+set = "competition-2025"
+name = "e430acf7-relativized-pigeon-hole.cnf"
+family = "relativized-pigeon-hole"
+profiles = ["competition-2025", "unsat", "crafted"]
+status = "UNSAT"
+source = "gbd-main-2025:e430acf720b63044e5c825a00a76b0eb"
+url = "https://benchmark-database.de/file/e430acf720b63044e5c825a00a76b0eb"
+sha256 = "773833d592a65a8a22b254cc8c8ed98f641736705bc2018e0a7e6f8a072048de"
+compressed_bytes = 15600
+bytes = 278309
+
+[[instance]]
+set = "competition-2025"
+name = "04f43bb4-risc-instruction-removal-golcrest.cnf"
+family = "risc-instruction-removal-golcrest"
+profiles = ["competition-2025", "unsat", "industrial"]
+status = "UNSAT"
+source = "gbd-main-2025:04f43bb4a4f2c193a18e7195a4fd8e41"
+url = "https://benchmark-database.de/file/04f43bb4a4f2c193a18e7195a4fd8e41"
+sha256 = "c0ff7f0dbae8283a733097a365405c80e3fe3c0041a4eb26e0e9878c86a32bb8"
+compressed_bytes = 2916492
+bytes = 29474802
+
+[[instance]]
+set = "competition-2025"
+name = "062f58e4-rooks.cnf"
+family = "rooks"
+profiles = ["competition-2025", "unsat", "graph"]
+status = "UNSAT"
+source = "gbd-main-2025:062f58e44eb73f9274b57af5092cad90"
+url = "https://benchmark-database.de/file/062f58e44eb73f9274b57af5092cad90"
+sha256 = "4aa18c3984954f440015b21e85359ef082a44d2f4c80b4490bef4bc25ab80aae"
+compressed_bytes = 930372
+bytes = 10112082
+
+[[instance]]
+set = "competition-2025"
+name = "69f6dd33-scheduling.cnf"
+family = "scheduling"
+profiles = ["competition-2025", "sat", "planning-scheduling"]
+status = "SAT"
+source = "gbd-main-2025:69f6dd335626a9b71bfc6f2332f52b9d"
+url = "https://benchmark-database.de/file/69f6dd335626a9b71bfc6f2332f52b9d"
+sha256 = "adca1afbe357cffd40eda927094e3ab3cc96d90b6b43153d403728aeb39ca96e"
+compressed_bytes = 2652
+bytes = 12237
+
+[[instance]]
+set = "competition-2025"
+name = "1d18837c-school-timetabling.cnf"
+family = "school-timetabling"
+profiles = ["competition-2025", "sat", "planning-scheduling"]
+status = "SAT"
+source = "gbd-main-2025:1d18837c0ced5c18a3a4693993e61728"
+url = "https://benchmark-database.de/file/1d18837c0ced5c18a3a4693993e61728"
+sha256 = "25c30c0878f6bb8034445a0b5852f2b9179e1679bc6bedfddf9088f413efb8d9"
+compressed_bytes = 1134112
+bytes = 13457873
+
+[[instance]]
+set = "competition-2025"
+name = "663bb565-set-covering.cnf"
+family = "set-covering"
+profiles = ["competition-2025", "unsat", "industrial"]
+status = "UNSAT"
+source = "gbd-main-2025:663bb5659e42c2c75f74354f48895302"
+url = "https://benchmark-database.de/file/663bb5659e42c2c75f74354f48895302"
+sha256 = "4bbc0928fb71f0cb30af3fe78e50d52e649aac99f9d8f29fed678b6d72ec1928"
+compressed_bytes = 94960
+bytes = 380553
+
+[[instance]]
+set = "competition-2025"
+name = "d421913d-sorting-networks.cnf"
+family = "sorting-networks"
+profiles = ["competition-2025", "unsat", "industrial"]
+status = "UNSAT"
+source = "gbd-main-2025:d421913def55cb5f7302ffe9918cc153"
+url = "https://benchmark-database.de/file/d421913def55cb5f7302ffe9918cc153"
+sha256 = "bc81f93aa47163fde3660e5b93125102359cc624b3d5303bfbad8f5720e2e001"
+compressed_bytes = 3600888
+bytes = 48298312
+
+[[instance]]
+set = "competition-2025"
+name = "a2ca167a-station-repacking.cnf"
+family = "station-repacking"
+profiles = ["competition-2025", "sat", "planning-scheduling"]
+status = "SAT"
+source = "gbd-main-2025:a2ca167a8fdbf165f40b5d6dee94b040"
+url = "https://benchmark-database.de/file/a2ca167a8fdbf165f40b5d6dee94b040"
+sha256 = "bc053107e97fd429a204f5dbe8f7afb40dbb8c3e3592b7a716eda6f50a5a2e6a"
+compressed_bytes = 889336
+bytes = 12344165
+
+[[instance]]
+set = "competition-2025"
+name = "85ba26d7-stedman-triples.cnf"
+family = "stedman-triples"
+profiles = ["competition-2025", "sat", "industrial"]
+status = "SAT"
+source = "gbd-main-2025:85ba26d796de9ad740ce5a6813488fbc"
+url = "https://benchmark-database.de/file/85ba26d796de9ad740ce5a6813488fbc"
+sha256 = "3e86157d0179bb4dd8e8ce4c81babda59207c90931eb19ac9420e4a5bac856b9"
+compressed_bytes = 256400
+bytes = 3007664
+
+[[instance]]
+set = "competition-2025"
+name = "5c29ccca-subgraph-isomorphism.cnf"
+family = "subgraph-isomorphism"
+profiles = ["competition-2025", "unsat", "graph"]
+status = "UNSAT"
+source = "gbd-main-2025:5c29ccca91235475f762f4b106f804f2"
+url = "https://benchmark-database.de/file/5c29ccca91235475f762f4b106f804f2"
+sha256 = "f4cba201406065a5f7a3ff1c206270cb404aafd7fed09c539414bd69f630bbda"
+compressed_bytes = 158040
+bytes = 525241
+
+[[instance]]
+set = "competition-2025"
+name = "b628043a-subset-cardinality.cnf"
+family = "subset-cardinality"
+profiles = ["competition-2025", "unsat", "industrial"]
+status = "UNSAT"
+source = "gbd-main-2025:b628043a07c5576dd6cd21c9d73a69e0"
+url = "https://benchmark-database.de/file/b628043a07c5576dd6cd21c9d73a69e0"
+sha256 = "f846af1254e91d2d222cbd3e14f20db68a174881b2a76e7a147e72a553526faa"
+compressed_bytes = 2768
+bytes = 8120
+
+[[instance]]
+set = "competition-2025"
+name = "de898802-sudoku.cnf"
+family = "sudoku"
+profiles = ["competition-2025", "unsat", "puzzle-csp"]
+status = "UNSAT"
+source = "gbd-main-2025:de8988028668791f35a7b9f94353b5b9"
+url = "https://benchmark-database.de/file/de8988028668791f35a7b9f94353b5b9"
+sha256 = "aae9a04e887600025a6d1a1c76384df55a907418a1c9112624135f5101a44ec8"
+compressed_bytes = 4502528
+bytes = 45775834
+
+[[instance]]
+set = "competition-2025"
+name = "7a044c99-sum-of-3-cubes.cnf"
+family = "sum-of-3-cubes"
+profiles = ["competition-2025", "sat", "crypto-arithmetic"]
+status = "SAT"
+source = "gbd-main-2025:7a044c997ede14d00002f1db39d45170"
+url = "https://benchmark-database.de/file/7a044c997ede14d00002f1db39d45170"
+sha256 = "3d018c231b18baa7894a9885e948e20d7dd27cfffc5fb9e906074a36158234f3"
+compressed_bytes = 290720
+bytes = 3412155
+
+[[instance]]
+set = "competition-2025"
+name = "6ef090a1-summle.cnf"
+family = "summle"
+profiles = ["competition-2025", "sat", "industrial"]
+status = "SAT"
+source = "gbd-main-2025:6ef090a10c10352090100af7b6654c31"
+url = "https://benchmark-database.de/file/6ef090a10c10352090100af7b6654c31"
+sha256 = "09832848d3c4a52517cee047820cc3b7b52ee3c347d4dfab07410e4ff852bc62"
+compressed_bytes = 381600
+bytes = 3980423
+
+[[instance]]
+set = "competition-2025"
+name = "ad9eb96b-termination-analysis.cnf"
+family = "termination-analysis"
+profiles = ["competition-2025", "unsat", "software"]
+status = "UNSAT"
+source = "gbd-main-2025:ad9eb96bac59319fc2f7daffd1f961f8"
+url = "https://benchmark-database.de/file/ad9eb96bac59319fc2f7daffd1f961f8"
+sha256 = "bb1517606a9ef0b80fe2c4e9c69281fe32b68cf3f5fd43dcdef2d3346fe4cbba"
+compressed_bytes = 31320
+bytes = 167579
+
+[[instance]]
+set = "competition-2025"
+name = "77a0d54f-tseitin-formulas.cnf"
+family = "tseitin-formulas"
+profiles = ["competition-2025", "unsat", "xor-parity"]
+status = "UNSAT"
+source = "gbd-main-2025:77a0d54f2fb3740a9a321623c0c10f3e"
+url = "https://benchmark-database.de/file/77a0d54f2fb3740a9a321623c0c10f3e"
+sha256 = "79618e35c83016fd1a188eb63ed499c3d1d4c364f710c9c9a93eb7925054a9af"
+compressed_bytes = 2536
+bytes = 17154
+
+[[instance]]
+set = "competition-2025"
+name = "967b58fe-unknown.cnf"
+family = "unknown"
+profiles = ["competition-2025", "unsat", "industrial"]
+status = "UNSAT"
+source = "gbd-main-2025:967b58fea99a99b8da592d3e2fe7139b"
+url = "https://benchmark-database.de/file/967b58fea99a99b8da592d3e2fe7139b"
+sha256 = "34b909ca599cc0dd36b99c10178ae60bd568a3fd677e27fa7343e18b12cf48e8"
+compressed_bytes = 32876
+bytes = 464137
+
+[[instance]]
+set = "competition-2025"
+name = "fab2022d-unknown-cases.cnf"
+family = "unknown-cases"
+profiles = ["competition-2025", "sat", "industrial"]
+status = "SAT"
+source = "gbd-main-2025:fab2022deb130fe3ad1136a5c71b4109"
+url = "https://benchmark-database.de/file/fab2022deb130fe3ad1136a5c71b4109"
+sha256 = "5d8f5a621357cac8ba878c6c81c2606c010d44d8c8a5c4a5a86a36566c5e7b0d"
+compressed_bytes = 8940
+bytes = 55885
+
+[[instance]]
+set = "competition-2025"
+name = "57b47898-waerden.cnf"
+family = "waerden"
+profiles = ["competition-2025", "sat", "crafted"]
+status = "SAT"
+source = "gbd-main-2025:57b478982ee9aba245ba792452b18fe3"
+url = "https://benchmark-database.de/file/57b478982ee9aba245ba792452b18fe3"
+sha256 = "5937a4cbd03d7deeccf6174c816f45cf926c105091acbb1ced616fb14971d400"
+compressed_bytes = 53100
+bytes = 582430

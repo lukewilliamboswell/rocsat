@@ -42,6 +42,7 @@ def load_manifest(path):
     if not isinstance(budget, int) or not 0 < budget < 1_000_000_000:
         raise ValueError("budget_bytes must be a positive integer below 1 GB")
     destinations = set()
+    declared_bytes = 0
     for kind in ("archive", "instance"):
         for entry in manifest.get(kind, []):
             validate_entry(entry, kind)
@@ -49,11 +50,14 @@ def load_manifest(path):
             if destination in destinations:
                 raise ValueError(f"duplicate corpus destination: {destination}")
             destinations.add(destination)
+            declared_bytes += entry["bytes"]
+    if declared_bytes > budget:
+        raise ValueError(f"manifest corpus exceeds budget: {declared_bytes} > {budget} bytes")
     return manifest
 
 
 def validate_entry(entry, kind):
-    required = {"set", "url", "sha256", "family", "profiles"}
+    required = {"set", "url", "sha256", "family", "profiles", "bytes"}
     if kind == "archive":
         required.add("files")
     else:
@@ -68,6 +72,8 @@ def validate_entry(entry, kind):
         raise ValueError(f"invalid sha256 for {entry.get('name', entry['set'])}")
     if not isinstance(entry["profiles"], list) or not entry["profiles"]:
         raise ValueError("profiles must be a nonempty list")
+    if not isinstance(entry["bytes"], int) or entry["bytes"] < 0:
+        raise ValueError("bytes must be a nonnegative integer")
     if kind == "archive" and (not isinstance(entry["files"], int) or entry["files"] <= 0):
         raise ValueError("archive files must be positive")
     if kind == "instance" and entry["status"] not in ("SAT", "UNSAT"):
@@ -143,7 +149,10 @@ def fetch_archive(entry, root, budget, force=False):
     files = archive_files(blob)
     if len(files) != entry["files"]:
         raise ValueError(f"{entry['set']}: expected {entry['files']} CNFs, found {len(files)}")
-    incoming = sum(len(data) for data in files.values()) + 65
+    content_bytes = sum(len(data) for data in files.values())
+    if content_bytes != entry["bytes"]:
+        raise ValueError(f"{entry['set']}: expected {entry['bytes']} extracted bytes, found {content_bytes}")
+    incoming = content_bytes + 65
     used = check_budget(root, budget, destination, incoming)
     temporary = Path(tempfile.mkdtemp(prefix=f".{entry['set']}.", dir=root))
     try:
@@ -175,6 +184,8 @@ def fetch_instance(entry, root, budget, force=False):
         raise ValueError(f"invalid xz instance: {entry['name']}") from error
     if sha256(data) != entry["sha256"]:
         raise ValueError(f"instance hash mismatch: {entry['name']}")
+    if len(data) != entry["bytes"]:
+        raise ValueError(f"instance size mismatch: {entry['name']}")
     directory.mkdir(parents=True, exist_ok=True)
     incoming = len(data) + 65
     used = check_budget(root, budget, destination, incoming)

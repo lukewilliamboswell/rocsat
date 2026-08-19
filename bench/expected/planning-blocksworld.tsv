@@ -1,0 +1,7 @@
+anomaly.cnf	SAT
+bw_large.a.cnf	SAT
+bw_large.b.cnf	SAT
+bw_large.c.cnf	SAT
+bw_large.d.cnf	SAT
+huge.cnf	SAT
+medium.cnf	SAT
