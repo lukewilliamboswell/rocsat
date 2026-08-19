@@ -11,6 +11,7 @@ import Core
 import Propagate
 import Analyze
 import Reduce
+import Simplify
 import Branch
 import Drat
 import Model
@@ -175,7 +176,7 @@ Solver :: [].{
     solve = |st0| {
         { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, search, stats, proof } = st0
         (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, trail_lim1, seen1, activity1, heap1, hpos1, phase1, bytes1, sc, status) =
-            search_loop(arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, proof.bytes, { trail_len: search.trail_len, dl: search.dl, qhead: search.qhead, heap_len: search.heap_len, var_inc: search.var_inc, ok: search.ok, conflicts: stats.conflicts, decisions: stats.decisions, propagations: stats.propagations, restarts: stats.restarts, reductions: stats.reductions, collections: stats.collections, deleted_clauses: stats.deleted_clauses, learnt_literals_before: stats.learnt_literals_before, learnt_literals_after: stats.learnt_literals_after, proof_on: proof.on, traced: proof.traced })
+            search_loop(arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, proof.bytes, { trail_len: search.trail_len, dl: search.dl, qhead: search.qhead, heap_len: search.heap_len, var_inc: search.var_inc, simplified: search.simplified, ok: search.ok, conflicts: stats.conflicts, decisions: stats.decisions, propagations: stats.propagations, restarts: stats.restarts, reductions: stats.reductions, collections: stats.collections, simplifications: stats.simplifications, simplified_clauses: stats.simplified_clauses, simplified_literals: stats.simplified_literals, deleted_clauses: stats.deleted_clauses, learnt_literals_before: stats.learnt_literals_before, learnt_literals_after: stats.learnt_literals_after, proof_on: proof.on, traced: proof.traced })
         st = {
             arena: arena1,
             pool: pool1,
@@ -192,14 +193,14 @@ Solver :: [].{
             heap: heap1,
             hpos: hpos1,
             phase: phase1,
-            search: { trail_len: sc.trail_len, dl: sc.dl, qhead: sc.qhead, heap_len: sc.heap_len, var_inc: sc.var_inc, ok: sc.ok },
-            stats: { conflicts: sc.conflicts, decisions: sc.decisions, propagations: sc.propagations, restarts: sc.restarts, reductions: sc.reductions, collections: sc.collections, deleted_clauses: sc.deleted_clauses, learnt_literals_before: sc.learnt_literals_before, learnt_literals_after: sc.learnt_literals_after },
+            search: { trail_len: sc.trail_len, dl: sc.dl, qhead: sc.qhead, heap_len: sc.heap_len, var_inc: sc.var_inc, simplified: sc.simplified, ok: sc.ok },
+            stats: { conflicts: sc.conflicts, decisions: sc.decisions, propagations: sc.propagations, restarts: sc.restarts, reductions: sc.reductions, collections: sc.collections, simplifications: sc.simplifications, simplified_clauses: sc.simplified_clauses, simplified_literals: sc.simplified_literals, deleted_clauses: sc.deleted_clauses, learnt_literals_before: sc.learnt_literals_before, learnt_literals_after: sc.learnt_literals_after },
             proof: { ..proof, bytes: bytes1, traced: sc.traced },
         }
         (st, status)
     }
 
-    SearchScalars : { trail_len : U64, dl : U64, qhead : U64, heap_len : U64, var_inc : F64, ok : Bool, conflicts : U64, decisions : U64, propagations : U64, restarts : U64, reductions : U64, collections : U64, deleted_clauses : U64, learnt_literals_before : U64, learnt_literals_after : U64, proof_on : Bool, traced : U64 }
+    SearchScalars : { trail_len : U64, dl : U64, qhead : U64, heap_len : U64, var_inc : F64, simplified : U64, ok : Bool, conflicts : U64, decisions : U64, propagations : U64, restarts : U64, reductions : U64, collections : U64, simplifications : U64, simplified_clauses : U64, simplified_literals : U64, deleted_clauses : U64, learnt_literals_before : U64, learnt_literals_after : U64, proof_on : Bool, traced : U64 }
 
     restart_first : U64
     restart_first = 1000
@@ -228,6 +229,7 @@ Solver :: [].{
         var $phase = phase
         var $heap_len = sc.heap_len
         var $var_inc = sc.var_inc
+        var $simplified = sc.simplified
         var $qhead = sc.qhead
         var $ok = sc.ok
         var $conflicts = sc.conflicts
@@ -236,6 +238,9 @@ Solver :: [].{
         var $restarts = sc.restarts
         var $reductions = sc.reductions
         var $collections = sc.collections
+        var $simplifications = sc.simplifications
+        var $simplified_clauses = sc.simplified_clauses
+        var $simplified_literals = sc.simplified_literals
         var $deleted_clauses = sc.deleted_clauses
         var $live_learnts = 0
         var $next_reduce = (($conflicts / 2000) + 1) * 2000
@@ -337,8 +342,13 @@ Solver :: [].{
                     $restart_limit = restart_first * luby(2, $restarts)
                     expect Branch.consistent($activity, $heap, $hpos, $heap_len)
                 } else {
-                    due_reduce = $conflicts >= $next_reduce
-                    (a5, p5, wo5, wl5, wc5, reason5, bytes5, deleted, live, collected) = Reduce.maybe($arena, $pool, $wofs, $wlen, $wcap, $value, $reason, $bytes, proof_on, due_reduce, $live_learnts)
+                    if $dl == 0 and proof_on {
+                        (bytes2, traced) = trace_units($bytes, $trail, $trail_len, $traced)
+                        $bytes = bytes2
+                        $traced = traced
+                    }
+                    due_simplify = $dl == 0 and $trail_len > $simplified
+                    (a5, p5, wo5, wl5, wc5, reason5, bytes5, removed, trimmed, live5, simplified5) = Simplify.maybe($arena, $pool, $wofs, $wlen, $wcap, $value, $reason, $trail, $trail_len, $bytes, proof_on, due_simplify, $live_learnts)
                     $arena = a5
                     $pool = p5
                     $wofs = wo5
@@ -346,17 +356,28 @@ Solver :: [].{
                     $wcap = wc5
                     $reason = reason5
                     $bytes = bytes5
-                    $live_learnts = live
+                    $live_learnts = live5
+                    if due_simplify {
+                        $simplified = $trail_len
+                        $simplifications = $simplifications + simplified5
+                        $simplified_clauses = $simplified_clauses + removed
+                        $simplified_literals = $simplified_literals + trimmed
+                    }
+                    due_reduce = $conflicts >= $next_reduce
+                    (a6, p6, wo6, wl6, wc6, reason6, bytes6, deleted, live6, collected) = Reduce.maybe($arena, $pool, $wofs, $wlen, $wcap, $value, $reason, $bytes, proof_on, due_reduce, $live_learnts)
+                    $arena = a6
+                    $pool = p6
+                    $wofs = wo6
+                    $wlen = wl6
+                    $wcap = wc6
+                    $reason = reason6
+                    $bytes = bytes6
+                    $live_learnts = live6
                     if due_reduce {
                         $reductions = $reductions + 1
                         $collections = $collections + collected
                         $deleted_clauses = $deleted_clauses + deleted
                         $next_reduce = $next_reduce + 2000
-                    }
-                    if $dl == 0 and proof_on {
-                        (bytes2, traced) = trace_units($bytes, $trail, $trail_len, $traced)
-                        $bytes = bytes2
-                        $traced = traced
                     }
                     (heap3, hpos3, heap_len3, v) = Branch.pick($activity, $heap, $hpos, $heap_len, $value, num_vars)
                     $heap = heap3
@@ -379,7 +400,7 @@ Solver :: [].{
                 }
             }
         }
-        scalars = { trail_len: $trail_len, dl: $dl, qhead: $qhead, heap_len: $heap_len, var_inc: $var_inc, ok: $ok, conflicts: $conflicts, decisions: $decisions, propagations: $props, restarts: $restarts, reductions: $reductions, collections: $collections, deleted_clauses: $deleted_clauses, learnt_literals_before: $learnt_literals_before, learnt_literals_after: $learnt_literals_after, proof_on, traced: $traced }
+        scalars = { trail_len: $trail_len, dl: $dl, qhead: $qhead, heap_len: $heap_len, var_inc: $var_inc, simplified: $simplified, ok: $ok, conflicts: $conflicts, decisions: $decisions, propagations: $props, restarts: $restarts, reductions: $reductions, collections: $collections, simplifications: $simplifications, simplified_clauses: $simplified_clauses, simplified_literals: $simplified_literals, deleted_clauses: $deleted_clauses, learnt_literals_before: $learnt_literals_before, learnt_literals_after: $learnt_literals_after, proof_on, traced: $traced }
         ($arena, $pool, $wofs, $wlen, $wcap, $value, $level, $reason, $trail, $trail_lim, $seen, $activity, $heap, $hpos, $phase, $bytes, scalars, if $status == Sat { Sat } else { Unsat })
     }
 
@@ -421,7 +442,10 @@ Solver :: [].{
     }
 
     stats : Core.State -> Str
-    stats = |st| "c conflicts=${st.stats.conflicts.to_str()} decisions=${st.stats.decisions.to_str()} propagations=${st.stats.propagations.to_str()} restarts=${st.stats.restarts.to_str()} reductions=${st.stats.reductions.to_str()} collections=${st.stats.collections.to_str()} deleted=${st.stats.deleted_clauses.to_str()} learnt_literals=${st.stats.learnt_literals_after.to_str()}/${st.stats.learnt_literals_before.to_str()}"
+    stats = |st| {
+        db = Reduce.counts(st.arena)
+        "c conflicts=${st.stats.conflicts.to_str()} decisions=${st.stats.decisions.to_str()} propagations=${st.stats.propagations.to_str()} restarts=${st.stats.restarts.to_str()} reductions=${st.stats.reductions.to_str()} collections=${st.stats.collections.to_str()} simplifications=${st.stats.simplifications.to_str()} simplified=${st.stats.simplified_clauses.to_str()}/${st.stats.simplified_literals.to_str()} deleted=${st.stats.deleted_clauses.to_str()} learnt_literals=${st.stats.learnt_literals_after.to_str()}/${st.stats.learnt_literals_before.to_str()} arena=${st.arena.len().to_str()}/${db.live_words.to_str()}"
+    }
 
     solve_cnf : Dimacs.Cnf -> [Sat(Model.Assignment), Unsat]
     solve_cnf = |cnf| {

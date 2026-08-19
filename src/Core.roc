@@ -47,10 +47,11 @@ Core :: [].{
 
     # `trail_len` assigned literals, `dl` decision levels (`trail_lim[0..dl]` = trail index of each
     # level's decision), `qhead` = first unpropagated trail index. `heap_len` is the live prefix of
-    # the fixed-capacity EVSIDS heap; `var_inc` is the next activity bump amount.
-    Search : { trail_len : U64, dl : U64, qhead : U64, heap_len : U64, var_inc : F64, ok : Bool }
+    # the fixed-capacity EVSIDS heap; `var_inc` is the next activity bump amount; `simplified` is
+    # the root-trail length consumed by the last level-0 simplification.
+    Search : { trail_len : U64, dl : U64, qhead : U64, heap_len : U64, var_inc : F64, simplified : U64, ok : Bool }
 
-    Stats : { conflicts : U64, decisions : U64, propagations : U64, restarts : U64, reductions : U64, collections : U64, deleted_clauses : U64, learnt_literals_before : U64, learnt_literals_after : U64 }
+    Stats : { conflicts : U64, decisions : U64, propagations : U64, restarts : U64, reductions : U64, collections : U64, simplifications : U64, simplified_clauses : U64, simplified_literals : U64, deleted_clauses : U64, learnt_literals_before : U64, learnt_literals_after : U64 }
 
     # `traced` = number of level-0 trail literals already emitted as unit lemmas.
     Proof : { on : Bool, bytes : List(U8), traced : U64 }
@@ -98,8 +99,8 @@ Core :: [].{
             heap: $heap,
             hpos: $hpos,
             phase: List.repeat(1, n),
-            search: { trail_len: 0, dl: 0, qhead: 0, heap_len: n, var_inc: 1.0, ok: Bool.True },
-            stats: { conflicts: 0, decisions: 0, propagations: 0, restarts: 0, reductions: 0, collections: 0, deleted_clauses: 0, learnt_literals_before: 0, learnt_literals_after: 0 },
+            search: { trail_len: 0, dl: 0, qhead: 0, heap_len: n, var_inc: 1.0, simplified: 0, ok: Bool.True },
+            stats: { conflicts: 0, decisions: 0, propagations: 0, restarts: 0, reductions: 0, collections: 0, simplifications: 0, simplified_clauses: 0, simplified_literals: 0, deleted_clauses: 0, learnt_literals_before: 0, learnt_literals_after: 0 },
             proof: { on: Bool.False, bytes: [], traced: 0 },
         }
     }
@@ -115,6 +116,19 @@ Core :: [].{
 
     clause_size : U32 -> U64
     clause_size = |header| header.bitwise_and(size_mask).to_u64()
+
+    clause_lits : List(U32), U32 -> List(U32)
+    clause_lits = |arena, cref| {
+        c = cref.to_u64()
+        size = clause_size(arena.get(c) ?? 0)
+        var $lits = List.with_capacity(size)
+        var $i = 0
+        while $i < size {
+            $lits = $lits.append(arena.get(c + 2 + $i) ?? 0)
+            $i = $i + 1
+        }
+        $lits
+    }
 
     # Assigns `lit` true at decision level `dl` with reason `from`, appending it to the trail.
     # `lit` must be unassigned.

@@ -72,7 +72,7 @@ Reduce :: [].{
         var $i = 0
         while $i < target {
             cref = ranked.get($i) ?? Core.none
-            if proof_on { $deletions = Drat.delete_clause($deletions, clause_lits($arena, cref)) }
+            if proof_on { $deletions = Drat.delete_clause($deletions, Core.clause_lits($arena, cref)) }
             $arena = Core.mark_deleted($arena, cref)
             $live_learnts = $live_learnts - 1
             $i = $i + 1
@@ -137,19 +137,6 @@ Reduce :: [].{
         asize = Core.clause_size(arena.get(au) ?? 0)
         bsize = Core.clause_size(arena.get(bu) ?? 0)
         if ag != bg { bg.compare(ag) } else if asize != bsize { bsize.compare(asize) } else { a.compare(b) }
-    }
-
-    clause_lits : List(U32), U32 -> List(U32)
-    clause_lits = |arena, cref| {
-        c = cref.to_u64()
-        size = Core.clause_size(arena.get(c) ?? 0)
-        var $lits = List.with_capacity(size)
-        var $i = 0
-        while $i < size {
-            $lits = $lits.append(arena.get(c + 2 + $i) ?? 0)
-            $i = $i + 1
-        }
-        $lits
     }
 }
 
