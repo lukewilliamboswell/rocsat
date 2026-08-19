@@ -7,7 +7,7 @@ import pf.Path
 import Dimacs
 import Model
 import Brute
-import Solver
+import Rocsat
 
 version = "0.0.0"
 
@@ -70,14 +70,21 @@ parse! = |file| {
 solve! : Str, [Some(Str), None] => Try({}, _)
 solve! = |file, proof_path| {
     cnf = read_cnf!(file)?
-    (st, result, _) = Solver.solve(Solver.from_cnf(cnf, proof_path != None), [])
-    Stdout.line!(Solver.stats(st))?
+    st0 = Rocsat.from_cnf(cnf, proof_path != None)
+    (st, result) = match Rocsat.solve(st0, []) {
+        Ok(answer) => answer
+        Err(err) => {
+            Stderr.line!("c error: ${Str.inspect(err)}")?
+            return Err(Exit(1))
+        }
+    }
+    Stdout.line!(Rocsat.stats(st))?
     match proof_path {
-        Some(path) => Path.utf8(path).write_bytes!(st.proof.bytes)?
+        Some(path) => Path.utf8(path).write_bytes!(Rocsat.proof_bytes(st))?
         None => {}
     }
     match result {
-        Sat => report_sat!(Solver.model(st))
+        Sat => report_sat!(Rocsat.model(st))
         Unsat => report_unsat!({})
     }
 }
