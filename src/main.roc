@@ -70,7 +70,7 @@ parse! = |file| {
 solve! : Str, [Some(Str), None] => Try({}, _)
 solve! = |file, proof_path| {
     cnf = read_cnf!(file)?
-    (st, result) = Solver.solve(Solver.from_cnf(cnf, proof_path != None))
+    (st, result, _) = Solver.solve(Solver.from_cnf(cnf, proof_path != None), [])
     Stdout.line!(Solver.stats(st))?
     match proof_path {
         Some(path) => Path.utf8(path).write_bytes!(st.proof.bytes)?

@@ -5,7 +5,7 @@
 #
 # `add_all` and `search` are the owner loops: they hold the unpacked state in `var`s and apply
 # one list-level step per statement (see the shape rule in Core); `add_clauses` and `solve`
-# unpack and repack the record around them.
+# normalize, unpack, and repack the record around them.
 
 import Core
 import Propagate
@@ -29,11 +29,26 @@ Solver :: [].{
     from_cnf : Dimacs.Cnf, Bool -> Core.State
     from_cnf = |cnf, proof_on| add_clauses(new(cnf.num_vars, proof_on), cnf.clauses)
 
+    # Restores the level-0 input state before another solve or clause addition while retaining the
+    # SAT assignment long enough for callers to inspect it.
+    to_root : Core.State -> Core.State
+    to_root = |st| {
+        if st.search.dl == 0 {
+            st
+        } else {
+            old_trail_len = st.search.trail_len
+            (value, trail_len, dl, qhead) = Core.cancel_until(st.value, st.trail, old_trail_len, st.trail_lim, st.search.dl, 0)
+            (heap, hpos, phase, heap_len) = Branch.backtrack(st.activity, st.heap, st.hpos, st.search.heap_len, st.phase, st.trail, trail_len, old_trail_len)
+            { ..st, value, heap, hpos, phase, search: { ..st.search, trail_len, dl, qhead, heap_len } }
+        }
+    }
+
     # Adds clauses at decision level 0: duplicates removed, false literals dropped, tautologies
     # and satisfied clauses skipped, units propagated immediately. Once a conflict has been
     # found (`ok = false`) further clauses are ignored.
     add_clauses : Core.State, List(List(U32)) -> Core.State
-    add_clauses = |st0, clauses| {
+    add_clauses = |input, clauses| {
+        st0 = to_root(input)
         { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, search, stats, proof } = st0
         expect search.dl == 0
         (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, bytes1, sc) =
@@ -172,11 +187,14 @@ Solver :: [].{
         ($bytes, trail_len)
     }
 
-    solve : Core.State -> (Core.State, [Sat, Unsat])
-    solve = |st0| {
-        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, search, stats, proof } = st0
-        (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, trail_lim1, seen1, activity1, heap1, hpos1, phase1, bytes1, sc, status) =
-            search_loop(arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, proof.bytes, { trail_len: search.trail_len, dl: search.dl, qhead: search.qhead, heap_len: search.heap_len, var_inc: search.var_inc, simplified: search.simplified, ok: search.ok, conflicts: stats.conflicts, decisions: stats.decisions, propagations: stats.propagations, restarts: stats.restarts, reductions: stats.reductions, collections: stats.collections, simplifications: stats.simplifications, simplified_clauses: stats.simplified_clauses, simplified_literals: stats.simplified_literals, deleted_clauses: stats.deleted_clauses, learnt_literals_before: stats.learnt_literals_before, learnt_literals_after: stats.learnt_literals_after, proof_on: proof.on, traced: proof.traced })
+    solve : Core.State, List(U32) -> (Core.State, [Sat, Unsat], List(U32))
+    solve = |input, assumptions| {
+        rooted = to_root(input)
+        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim: old_trail_lim, seen, activity, heap, hpos, phase, search, stats, proof } = rooted
+        needed_levels = level.len() + assumptions.len()
+        trail_lim = if old_trail_lim.len() < needed_levels { old_trail_lim.concat(List.repeat(0, needed_levels - old_trail_lim.len())) } else { old_trail_lim }
+        (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, trail_lim1, seen1, activity1, heap1, hpos1, phase1, bytes1, sc, status, final) =
+            search_loop(arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, proof.bytes, { trail_len: search.trail_len, dl: search.dl, qhead: search.qhead, heap_len: search.heap_len, var_inc: search.var_inc, simplified: search.simplified, ok: search.ok, conflicts: stats.conflicts, decisions: stats.decisions, propagations: stats.propagations, restarts: stats.restarts, reductions: stats.reductions, collections: stats.collections, simplifications: stats.simplifications, simplified_clauses: stats.simplified_clauses, simplified_literals: stats.simplified_literals, deleted_clauses: stats.deleted_clauses, learnt_literals_before: stats.learnt_literals_before, learnt_literals_after: stats.learnt_literals_after, proof_on: proof.on, traced: proof.traced }, assumptions)
         st = {
             arena: arena1,
             pool: pool1,
@@ -197,7 +215,7 @@ Solver :: [].{
             stats: { conflicts: sc.conflicts, decisions: sc.decisions, propagations: sc.propagations, restarts: sc.restarts, reductions: sc.reductions, collections: sc.collections, simplifications: sc.simplifications, simplified_clauses: sc.simplified_clauses, simplified_literals: sc.simplified_literals, deleted_clauses: sc.deleted_clauses, learnt_literals_before: sc.learnt_literals_before, learnt_literals_after: sc.learnt_literals_after },
             proof: { ..proof, bytes: bytes1, traced: sc.traced },
         }
-        (st, status)
+        (st, status, final)
     }
 
     SearchScalars : { trail_len : U64, dl : U64, qhead : U64, heap_len : U64, var_inc : F64, simplified : U64, ok : Bool, conflicts : U64, decisions : U64, propagations : U64, restarts : U64, reductions : U64, collections : U64, simplifications : U64, simplified_clauses : U64, simplified_literals : U64, deleted_clauses : U64, learnt_literals_before : U64, learnt_literals_after : U64, proof_on : Bool, traced : U64 }
@@ -206,8 +224,8 @@ Solver :: [].{
     restart_first = 1000
 
     # The CDCL loop on the unpacked state.
-    search_loop : List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), List(U8), SearchScalars -> (List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), List(U8), SearchScalars, [Sat, Unsat])
-    search_loop = |arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, bytes, sc| {
+    search_loop : List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), List(U8), SearchScalars, List(U32) -> (List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), List(U8), SearchScalars, [Sat, Unsat], List(U32))
+    search_loop = |arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, bytes, sc, assumptions| {
         num_vars = level.len()
         proof_on = sc.proof_on
         var $arena = arena
@@ -242,7 +260,7 @@ Solver :: [].{
         var $simplified_clauses = sc.simplified_clauses
         var $simplified_literals = sc.simplified_literals
         var $deleted_clauses = sc.deleted_clauses
-        var $live_learnts = 0
+        var $live_learnts = Reduce.counts(arena).learnt
         var $next_reduce = (($conflicts / 2000) + 1) * 2000
         var $learnt_literals_before = sc.learnt_literals_before
         var $learnt_literals_after = sc.learnt_literals_after
@@ -250,6 +268,7 @@ Solver :: [].{
         var $restart_limit = restart_first * luby(2, sc.restarts)
         var $bytes = bytes
         var $traced = sc.traced
+        var $final = []
         var $status = if sc.ok { Unknown } else { Unsat }
         while $status == Unknown {
             dl = $dl.to_u32_wrap()
@@ -379,29 +398,55 @@ Solver :: [].{
                         $deleted_clauses = $deleted_clauses + deleted
                         $next_reduce = $next_reduce + 2000
                     }
-                    (heap3, hpos3, heap_len3, v) = Branch.pick($activity, $heap, $hpos, $heap_len, $value, num_vars)
-                    $heap = heap3
-                    $hpos = hpos3
-                    $heap_len = heap_len3
-                    if v < num_vars {
-                        $trail_lim = Core.put($trail_lim, $dl, $trail_len.to_u32_wrap())
-                        $dl = $dl + 1
-                        $decisions = $decisions + 1
-                        sign = ($phase.get(v) ?? 1).to_u64()
-                        (va3, le3, re3, tr3, tl3) = Core.assign($value, $level, $reason, $trail, $trail_len, (2 * v + sign).to_u32_wrap(), Core.none, dl + 1)
-                        $value = va3
-                        $level = le3
-                        $reason = re3
-                        $trail = tr3
-                        $trail_len = tl3
-                    } else {
-                        $status = Sat
+                    var $made_assumption = Bool.False
+                    while $dl < assumptions.len() and !$made_assumption and $status == Unknown {
+                        assumption = assumptions.get($dl) ?? 0
+                        val = $value.get(assumption.to_u64()) ?? Model.unassigned
+                        if val == Model.false_val {
+                            (seen7, final7) = Analyze.final($arena, $trail, $trail_len, $trail_lim, $level, $reason, $seen, assumption.bitwise_xor(1))
+                            $seen = seen7
+                            $final = final7
+                            $status = Unsat
+                        } else {
+                            $trail_lim = Core.put($trail_lim, $dl, $trail_len.to_u32_wrap())
+                            $dl = $dl + 1
+                            if val == Model.unassigned {
+                                $decisions = $decisions + 1
+                                (va7, le7, re7, tr7, tl7) = Core.assign($value, $level, $reason, $trail, $trail_len, assumption, Core.none, $dl.to_u32_wrap())
+                                $value = va7
+                                $level = le7
+                                $reason = re7
+                                $trail = tr7
+                                $trail_len = tl7
+                                $made_assumption = Bool.True
+                            }
+                        }
+                    }
+                    if $status == Unknown and !$made_assumption {
+                        (heap3, hpos3, heap_len3, v) = Branch.pick($activity, $heap, $hpos, $heap_len, $value, num_vars)
+                        $heap = heap3
+                        $hpos = hpos3
+                        $heap_len = heap_len3
+                        if v < num_vars {
+                            $trail_lim = Core.put($trail_lim, $dl, $trail_len.to_u32_wrap())
+                            $dl = $dl + 1
+                            $decisions = $decisions + 1
+                            sign = ($phase.get(v) ?? 1).to_u64()
+                            (va3, le3, re3, tr3, tl3) = Core.assign($value, $level, $reason, $trail, $trail_len, (2 * v + sign).to_u32_wrap(), Core.none, $dl.to_u32_wrap())
+                            $value = va3
+                            $level = le3
+                            $reason = re3
+                            $trail = tr3
+                            $trail_len = tl3
+                        } else {
+                            $status = Sat
+                        }
                     }
                 }
             }
         }
         scalars = { trail_len: $trail_len, dl: $dl, qhead: $qhead, heap_len: $heap_len, var_inc: $var_inc, simplified: $simplified, ok: $ok, conflicts: $conflicts, decisions: $decisions, propagations: $props, restarts: $restarts, reductions: $reductions, collections: $collections, simplifications: $simplifications, simplified_clauses: $simplified_clauses, simplified_literals: $simplified_literals, deleted_clauses: $deleted_clauses, learnt_literals_before: $learnt_literals_before, learnt_literals_after: $learnt_literals_after, proof_on, traced: $traced }
-        ($arena, $pool, $wofs, $wlen, $wcap, $value, $level, $reason, $trail, $trail_lim, $seen, $activity, $heap, $hpos, $phase, $bytes, scalars, if $status == Sat { Sat } else { Unsat })
+        ($arena, $pool, $wofs, $wlen, $wcap, $value, $level, $reason, $trail, $trail_lim, $seen, $activity, $heap, $hpos, $phase, $bytes, scalars, if $status == Sat { Sat } else { Unsat }, $final)
     }
 
     # `1,1,2,1,1,2,4,...` for `y = 2`.
@@ -449,7 +494,7 @@ Solver :: [].{
 
     solve_cnf : Dimacs.Cnf -> [Sat(Model.Assignment), Unsat]
     solve_cnf = |cnf| {
-        (st, r) = solve(from_cnf(cnf, Bool.False))
+        (st, r, _) = solve(from_cnf(cnf, Bool.False), [])
         match r {
             Sat => Sat(model(st))
             Unsat => Unsat
@@ -568,6 +613,47 @@ expect Solver.solve_cnf({ num_vars: 2, clauses: [[0], [1]] }) == Unsat
 expect Solver.solve_cnf({ num_vars: 2, clauses: [[0, 2], [0, 3], [1, 2], [1, 3]] }) == Unsat
 expect Solver.solve_cnf({ num_vars: 3, clauses: [[0, 2], [1, 4], [3, 5]] }) == Sat([2, 1, 2])
 expect Solver.solve_cnf({ num_vars: 3, clauses: [[0, 2, 4], [1, 2, 4], [0, 3, 4], [0, 2, 5], [1, 3, 4], [1, 2, 5], [0, 3, 5], [1, 3, 5]] }) == Unsat
+
+# Root implications can reject an assumption without poisoning the next call.
+expect {
+    st0 = Solver.from_cnf({ num_vars: 1, clauses: [[0]] }, Bool.False)
+    (st1, r1, final1) = Solver.solve(st0, [1])
+    (st2, r2, final2) = Solver.solve(st1, [0])
+    r1 == Unsat and final1 == [0] and st1.search.ok
+    and r2 == Sat and final2.is_empty() and Solver.model(st2) == [Model.true_val]
+}
+
+# Contradictory assumptions and implication chains return clauses negating only assumptions.
+expect {
+    empty = Solver.new(1, Bool.False)
+    (st1, r1, final1) = Solver.solve(empty, [0, 1])
+    chain = Solver.from_cnf({ num_vars: 2, clauses: [[1, 2]] }, Bool.False)
+    (st2, r2, final2) = Solver.solve(chain, [0, 3])
+    r1 == Unsat and final1 == [0, 1] and st1.search.ok
+    and r2 == Unsat and final2 == [2, 1] and st2.search.ok
+}
+
+# Already-true assumptions still occupy dummy levels, and another solve first restores level 0.
+expect {
+    st0 = Solver.from_cnf({ num_vars: 2, clauses: [[0]] }, Bool.False)
+    (st1, r1, _) = Solver.solve(st0, [0, 0])
+    (st2, r2, _) = Solver.solve(st1, [])
+    r1 == Sat and st1.search.dl >= 2 and r2 == Sat and st2.search.ok
+}
+
+# Only a global root conflict permanently marks the state UNSAT and has no assumption conflict.
+expect {
+    st0 = Solver.from_cnf({ num_vars: 1, clauses: [[0], [1]] }, Bool.False)
+    (st1, result, final) = Solver.solve(st0, [0])
+    result == Unsat and final.is_empty() and !st1.search.ok
+}
+
+# Adding after SAT cancels decisions and propagates the new root clause.
+expect {
+    (sat, result, _) = Solver.solve(Solver.from_cnf({ num_vars: 2, clauses: [[0, 2]] }, Bool.False), [])
+    added = Solver.add_clauses(sat, [[0]])
+    result == Sat and added.search.dl == 0 and Solver.trail_of(added).contains(0)
+}
 
 # Differential against the brute-force reference on seeded random 8-var 3-CNFs.
 expect {

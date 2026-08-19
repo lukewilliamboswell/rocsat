@@ -77,6 +77,47 @@ Analyze :: [].{
         ($seen, $learnt, bt, touched, $used_clauses, before, glue)
     }
 
+    # Derives the final conflict from a true literal that contradicts the next assumption. The
+    # returned literals negate the participating assumptions; all temporary marks are cleared.
+    final : List(U32), List(U32), U64, List(U32), List(U32), List(U32), List(U8), U32 -> (List(U8), List(U32))
+    final = |arena, trail, trail_len, trail_lim, level, reason, seen, p| {
+        var $seen = seen
+        var $out = [p]
+        pv = p.shr_wrap(1).to_u64()
+        if (level.get(pv) ?? 0) > 0 {
+            $seen = Core.put($seen, pv, 1)
+            root = (trail_lim.get(0) ?? 0).to_u64()
+            var $i = trail_len
+            while $i > root {
+                $i = $i - 1
+                q = trail.get($i) ?? 0
+                v = q.shr_wrap(1).to_u64()
+                if ($seen.get(v) ?? 0) != 0 {
+                    c = reason.get(v) ?? Core.none
+                    if c == Core.none {
+                        $out = $out.append(q.bitwise_xor(1))
+                    } else {
+                        cu = c.to_u64()
+                        end = cu + 2 + Core.clause_size(arena.get(cu) ?? 0)
+                        var $k = cu + 3
+                        while $k < end {
+                            r = arena.get($k) ?? 0
+                            rv = r.shr_wrap(1).to_u64()
+                            if (level.get(rv) ?? 0) > 0 {
+                                $seen = Core.put($seen, rv, 1)
+                            }
+                            $k = $k + 1
+                        }
+                    }
+                    $seen = Core.put($seen, v, 0)
+                }
+            }
+        }
+        $seen = Core.put($seen, pv, 0)
+        expect $seen.all(|s| s == 0)
+        ($seen, $out)
+    }
+
     # MiniSat 2.2 recursive minimization. `source_clear` contains the derivation marks already in
     # `seen`; successful reason traversals remain marked so later candidates can reuse them. Before
     # clearing those marks, values 2 and 3 temporarily mark each learned decision level through its
@@ -209,4 +250,14 @@ expect {
     seen = [0, 1, 0, 1, 1]
     (cleared, learnt, _) = Analyze.minimize(arena, [6, 8, 2, 0, 0], [0, 1, 2, 3, 0], [4, 3, 4, 1, 2], reason, seen, [1, 3, 4], [1, 3, 7, 9])
     learnt == [1, 3, 7, 9] and cleared.all(|s| s == 0)
+}
+
+# Final analysis resolves an implied contradiction back to both assumption decisions.
+expect {
+    st = Core.new(2)
+    (arena, reason_clause) = Core.alloc(st.arena, [2, 1], Bool.False, 0)
+    (v1, l1, r1, t1, n1) = Core.assign(st.value, st.level, st.reason, st.trail, 0, 0, Core.none, 1)
+    (value, level, reason, trail, trail_len) = Core.assign(v1, l1, r1, t1, n1, 2, reason_clause, 1)
+    (seen, final) = Analyze.final(arena, trail, trail_len, [0, 0], level, reason, st.seen, 2)
+    value.len() == 4 and final == [2, 1] and seen.all(|s| s == 0)
 }
