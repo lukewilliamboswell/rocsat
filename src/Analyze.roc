@@ -6,8 +6,8 @@ Analyze :: [].{
     # Precondition: decision level `dl` > 0 and `confl` is a clause with every literal false.
     # Returns `seen` (all zero again), the learnt clause with the asserting literal at index 0
     # and, when it has more than one literal, the literal of the highest remaining level at
-    # index 1; and the backjump level.
-    analyze : List(U32), List(U32), U64, List(U32), List(U32), List(U8), U32, U32 -> (List(U8), List(U32), U32)
+    # index 1; the backjump level; and every variable visited, for the EVSIDS bump.
+    analyze : List(U32), List(U32), U64, List(U32), List(U32), List(U8), U32, U32 -> (List(U8), List(U32), U32, List(U32))
     analyze = |arena, trail, trail_len, level, reason, seen, dl, confl| {
         var $seen = seen
         var $learnt = [0]
@@ -29,7 +29,7 @@ Analyze :: [].{
                 lv = level.get(v) ?? 0
                 if ($seen.get(v) ?? 1) == 0 and lv > 0 {
                     $seen = Core.put($seen, v, 1)
-                    $to_clear = $to_clear.append(v)
+                    $to_clear = $to_clear.append(v.to_u32_wrap())
                     if lv == dl {
                         $path = $path + 1
                     } else {
@@ -68,10 +68,10 @@ Analyze :: [].{
                 level_of(level, $learnt, 1)
             }
         for v in $to_clear {
-            $seen = Core.put($seen, v, 0)
+            $seen = Core.put($seen, v.to_u64(), 0)
         }
         expect $seen.all(|s| s == 0)
-        ($seen, $learnt, bt)
+        ($seen, $learnt, bt, $to_clear)
     }
 
     level_of : List(U32), List(U32), U64 -> U32

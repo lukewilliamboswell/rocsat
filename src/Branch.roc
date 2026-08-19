@@ -1,0 +1,214 @@
+# EVSIDS variable ordering. The heap is a fixed-capacity max-heap with an explicit live length;
+# assigned variables may remain until a pick discards them, and backtracking reinserts discarded
+# variables. Equal activities prefer the lower variable id, keeping search deterministic.
+
+import Core
+import Model
+
+Branch :: [].{
+    absent : U32
+    absent = 0xFFFFFFFF
+
+    new : U64 -> (List(F64), List(U32), List(U32), U64)
+    new = |n| {
+        var $heap = List.with_capacity(n)
+        var $hpos = List.with_capacity(n)
+        var $v = 0
+        while $v < n {
+            $heap = $heap.append($v.to_u32_wrap())
+            $hpos = $hpos.append($v.to_u32_wrap())
+            $v = $v + 1
+        }
+        (List.repeat(0, n), $heap, $hpos, n)
+    }
+
+    # Bumps every variable visited by conflict analysis, repairs the heap upward, rescales when
+    # needed, and applies the 0.95 decay by increasing the next bump amount.
+    bump_all : List(F64), List(U32), List(U32), List(U32), F64 -> (List(F64), List(U32), List(U32), F64)
+    bump_all = |activity, heap, hpos, touched, var_inc| {
+        var $activity = activity
+        var $heap = heap
+        var $hpos = hpos
+        var $rescale = Bool.False
+        for v32 in touched {
+            v = v32.to_u64()
+            score = ($activity.get(v) ?? 0) + var_inc
+            $activity = Core.put($activity, v, score)
+            if score > 1.0e100 { $rescale = Bool.True }
+            var $i = ($hpos.get(v) ?? absent).to_u64()
+            if $i != absent.to_u64() {
+                while $i > 0 {
+                    parent = ($i - 1) / 2
+                    pv = ($heap.get(parent) ?? 0).to_u64()
+                    pscore = $activity.get(pv) ?? 0
+                    if score > pscore or (score == pscore and v < pv) {
+                        $heap = Core.put($heap, $i, pv.to_u32_wrap())
+                        $heap = Core.put($heap, parent, v32)
+                        $hpos = Core.put($hpos, pv, $i.to_u32_wrap())
+                        $hpos = Core.put($hpos, v, parent.to_u32_wrap())
+                        $i = parent
+                    } else {
+                        $i = 0
+                    }
+                }
+            }
+        }
+        next_inc = var_inc / 0.95
+        if $rescale {
+            var $v = 0
+            while $v < $activity.len() {
+                $activity = Core.put($activity, $v, ($activity.get($v) ?? 0) * 1.0e-100)
+                $v = $v + 1
+            }
+            ($activity, $heap, $hpos, next_inc * 1.0e-100)
+        } else {
+            ($activity, $heap, $hpos, next_inc)
+        }
+    }
+
+    # Removes heap maxima until it finds an unassigned variable. The chosen variable is removed;
+    # `num_vars` is returned when no variable remains.
+    pick : List(F64), List(U32), List(U32), U64, List(U8), U64 -> (List(U32), List(U32), U64, U64)
+    pick = |activity, heap, hpos, heap_len, value, num_vars| {
+        var $heap = heap
+        var $hpos = hpos
+        var $len = heap_len
+        var $picked = num_vars
+        while $picked == num_vars and $len > 0 {
+            root = ($heap.get(0) ?? 0).to_u64()
+            $len = $len - 1
+            $hpos = Core.put($hpos, root, absent)
+            if $len > 0 {
+                moved32 = $heap.get($len) ?? 0
+                moved = moved32.to_u64()
+                $heap = Core.put($heap, 0, moved32)
+                $hpos = Core.put($hpos, moved, 0)
+                var $i = 0
+                var $down = Bool.True
+                while $down {
+                    left = 2 * $i + 1
+                    if left >= $len {
+                        $down = Bool.False
+                    } else {
+                        right = left + 1
+                        lv = ($heap.get(left) ?? 0).to_u64()
+                        best =
+                            if right < $len {
+                                rv = ($heap.get(right) ?? 0).to_u64()
+                                ls = activity.get(lv) ?? 0
+                                rs = activity.get(rv) ?? 0
+                                if rs > ls or (rs == ls and rv < lv) { right } else { left }
+                            } else {
+                                left
+                            }
+                        bv = ($heap.get(best) ?? 0).to_u64()
+                        bs = activity.get(bv) ?? 0
+                        ms = activity.get(moved) ?? 0
+                        if bs > ms or (bs == ms and bv < moved) {
+                            $heap = Core.put($heap, $i, bv.to_u32_wrap())
+                            $heap = Core.put($heap, best, moved32)
+                            $hpos = Core.put($hpos, bv, $i.to_u32_wrap())
+                            $hpos = Core.put($hpos, moved, best.to_u32_wrap())
+                            $i = best
+                        } else {
+                            $down = Bool.False
+                        }
+                    }
+                }
+            }
+            if (value.get(2 * root) ?? 0) == Model.unassigned { $picked = root }
+        }
+        ($heap, $hpos, $len, $picked)
+    }
+
+    # Reinserts variables from the erased trail suffix when they were previously discarded by a
+    # lazy heap pick. `trail[start..end]` is unchanged storage whose assignments were just erased.
+    reinsert : List(F64), List(U32), List(U32), U64, List(U32), U64, U64 -> (List(U32), List(U32), U64)
+    reinsert = |activity, heap, hpos, heap_len, trail, start, end| {
+        var $heap = heap
+        var $hpos = hpos
+        var $len = heap_len
+        var $k = start
+        while $k < end {
+            v32 = (trail.get($k) ?? 0).shr_wrap(1)
+            v = v32.to_u64()
+            if ($hpos.get(v) ?? absent) == absent {
+                expect $len < $heap.len()
+                $heap = Core.put($heap, $len, v32)
+                $hpos = Core.put($hpos, v, $len.to_u32_wrap())
+                score = activity.get(v) ?? 0
+                var $i = $len
+                $len = $len + 1
+                while $i > 0 {
+                    parent = ($i - 1) / 2
+                    pv = ($heap.get(parent) ?? 0).to_u64()
+                    pscore = activity.get(pv) ?? 0
+                    if score > pscore or (score == pscore and v < pv) {
+                        $heap = Core.put($heap, $i, pv.to_u32_wrap())
+                        $heap = Core.put($heap, parent, v32)
+                        $hpos = Core.put($hpos, pv, $i.to_u32_wrap())
+                        $hpos = Core.put($hpos, v, parent.to_u32_wrap())
+                        $i = parent
+                    } else {
+                        $i = 0
+                    }
+                }
+            }
+            $k = $k + 1
+        }
+        ($heap, $hpos, $len)
+    }
+
+    # Heap and inverse-position invariant for the live prefix. O(n); tests only.
+    consistent : List(F64), List(U32), List(U32), U64 -> Bool
+    consistent = |activity, heap, hpos, heap_len| {
+        var $ok = heap_len <= heap.len()
+        var $i = 0
+        while $i < heap_len {
+            v = (heap.get($i) ?? absent).to_u64()
+            if v >= hpos.len() or (hpos.get(v) ?? absent) != $i.to_u32_wrap() { $ok = Bool.False }
+            if $i > 0 {
+                parent = ($i - 1) / 2
+                pv = (heap.get(parent) ?? absent).to_u64()
+                vs = activity.get(v) ?? 0
+                ps = activity.get(pv) ?? 0
+                if vs > ps or (vs == ps and v < pv) { $ok = Bool.False }
+            }
+            $i = $i + 1
+        }
+        var $v = 0
+        while $v < hpos.len() {
+            pos = (hpos.get($v) ?? absent).to_u64()
+            if pos != absent.to_u64() and (pos >= heap_len or (heap.get(pos) ?? absent).to_u64() != $v) { $ok = Bool.False }
+            $v = $v + 1
+        }
+        $ok
+    }
+}
+
+expect {
+    (activity, heap, hpos, len) = Branch.new(5)
+    (heap1, hpos1, len1, v0) = Branch.pick(activity, heap, hpos, len, List.repeat(Model.unassigned, 10), 5)
+    (heap2, hpos2, len2) = Branch.reinsert(activity, heap1, hpos1, len1, [0, 0, 0, 0, 0], 0, 1)
+    v0 == 0 and len1 == 4 and len2 == 5 and Branch.consistent(activity, heap2, hpos2, len2)
+}
+
+expect {
+    (activity, heap, hpos, len) = Branch.new(5)
+    (activity1, heap1, hpos1, inc1) = Branch.bump_all(activity, heap, hpos, [3, 3, 1], 1.0)
+    (heap2, hpos2, len2, v) = Branch.pick(activity1, heap1, hpos1, len, List.repeat(Model.unassigned, 10), 5)
+    v == 3 and (activity1.get(3) ?? 0) == 2 and inc1 > 1 and Branch.consistent(activity1, heap2, hpos2, len2)
+}
+
+expect {
+    (activity, heap, hpos, len) = Branch.new(3)
+    assigned = [Model.true_val, Model.false_val, Model.unassigned, Model.unassigned, Model.unassigned, Model.unassigned]
+    (heap1, hpos1, len1, v) = Branch.pick(activity, heap, hpos, len, assigned, 3)
+    v == 1 and len1 == 1 and (hpos1.get(0) ?? 0) == Branch.absent and Branch.consistent(activity, heap1, hpos1, len1)
+}
+
+expect {
+    (activity, heap, hpos, _) = Branch.new(1)
+    (activity1, _, _, inc1) = Branch.bump_all(activity, heap, hpos, [0], 1.0e101)
+    (activity1.get(0) ?? 0) < 100 and inc1 < 100
+}

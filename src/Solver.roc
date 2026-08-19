@@ -1,6 +1,6 @@
 # The CDCL solver: clause input at level 0, the search loop (propagate, analyse, backjump,
-# learn), model extraction and DRAT emission. Decision heuristic: lowest unassigned variable,
-# negative phase. No restarts, no clause deletion, no minimisation.
+# learn), model extraction and DRAT emission. Decision heuristic: EVSIDS with an activity heap,
+# initially negative phase. No restarts, no clause deletion, no minimisation.
 #
 # `add_all` and `search` are the owner loops: they hold the unpacked state in `var`s and apply
 # one list-level step per statement (see the shape rule in Core); `add_clauses` and `solve`
@@ -9,6 +9,7 @@
 import Core
 import Propagate
 import Analyze
+import Branch
 import Drat
 import Model
 import Dimacs
@@ -30,7 +31,7 @@ Solver :: [].{
     # found (`ok = false`) further clauses are ignored.
     add_clauses : Core.State, List(List(U32)) -> Core.State
     add_clauses = |st0, clauses| {
-        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, search, stats, proof } = st0
+        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, search, stats, proof } = st0
         expect search.dl == 0
         (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, bytes1, sc) =
             add_all(arena, pool, wofs, wlen, wcap, value, level, reason, trail, proof.bytes, { trail_len: search.trail_len, qhead: search.qhead, ok: search.ok, propagations: stats.propagations, proof_on: proof.on, traced: proof.traced }, clauses)
@@ -46,6 +47,9 @@ Solver :: [].{
             trail: trail1,
             trail_lim,
             seen,
+            activity,
+            heap,
+            hpos,
             search: { ..search, trail_len: sc.trail_len, qhead: sc.qhead, ok: sc.ok },
             stats: { ..stats, propagations: sc.propagations },
             proof: { ..proof, bytes: bytes1, traced: sc.traced },
@@ -166,9 +170,9 @@ Solver :: [].{
 
     solve : Core.State -> (Core.State, [Sat, Unsat])
     solve = |st0| {
-        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, search, stats, proof } = st0
-        (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, trail_lim1, seen1, bytes1, sc, status) =
-            search_loop(arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, proof.bytes, { trail_len: search.trail_len, dl: search.dl, qhead: search.qhead, next_var: search.next_var, ok: search.ok, conflicts: stats.conflicts, decisions: stats.decisions, propagations: stats.propagations, proof_on: proof.on, traced: proof.traced })
+        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, search, stats, proof } = st0
+        (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, trail_lim1, seen1, activity1, heap1, hpos1, bytes1, sc, status) =
+            search_loop(arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, proof.bytes, { trail_len: search.trail_len, dl: search.dl, qhead: search.qhead, heap_len: search.heap_len, var_inc: search.var_inc, ok: search.ok, conflicts: stats.conflicts, decisions: stats.decisions, propagations: stats.propagations, proof_on: proof.on, traced: proof.traced })
         st = {
             arena: arena1,
             pool: pool1,
@@ -181,18 +185,21 @@ Solver :: [].{
             trail: trail1,
             trail_lim: trail_lim1,
             seen: seen1,
-            search: { trail_len: sc.trail_len, dl: sc.dl, qhead: sc.qhead, next_var: sc.next_var, ok: sc.ok },
+            activity: activity1,
+            heap: heap1,
+            hpos: hpos1,
+            search: { trail_len: sc.trail_len, dl: sc.dl, qhead: sc.qhead, heap_len: sc.heap_len, var_inc: sc.var_inc, ok: sc.ok },
             stats: { conflicts: sc.conflicts, decisions: sc.decisions, propagations: sc.propagations },
             proof: { ..proof, bytes: bytes1, traced: sc.traced },
         }
         (st, status)
     }
 
-    SearchScalars : { trail_len : U64, dl : U64, qhead : U64, next_var : U64, ok : Bool, conflicts : U64, decisions : U64, propagations : U64, proof_on : Bool, traced : U64 }
+    SearchScalars : { trail_len : U64, dl : U64, qhead : U64, heap_len : U64, var_inc : F64, ok : Bool, conflicts : U64, decisions : U64, propagations : U64, proof_on : Bool, traced : U64 }
 
     # The CDCL loop on the unpacked state.
-    search_loop : List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(U8), SearchScalars -> (List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(U8), SearchScalars, [Sat, Unsat])
-    search_loop = |arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, bytes, sc| {
+    search_loop : List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), SearchScalars -> (List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), SearchScalars, [Sat, Unsat])
+    search_loop = |arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, bytes, sc| {
         num_vars = level.len()
         proof_on = sc.proof_on
         var $arena = arena
@@ -208,8 +215,12 @@ Solver :: [].{
         var $trail_lim = trail_lim
         var $dl = sc.dl
         var $seen = seen
+        var $activity = activity
+        var $heap = heap
+        var $hpos = hpos
+        var $heap_len = sc.heap_len
+        var $var_inc = sc.var_inc
         var $qhead = sc.qhead
-        var $next_var = sc.next_var
         var $ok = sc.ok
         var $conflicts = sc.conflicts
         var $decisions = sc.decisions
@@ -241,14 +252,23 @@ Solver :: [].{
                     }
                     $status = Unsat
                 } else {
-                    (seen1, learnt, bt) = Analyze.analyze($arena, $trail, $trail_len, $level, $reason, $seen, dl, confl)
+                    (seen1, learnt, bt, touched) = Analyze.analyze($arena, $trail, $trail_len, $level, $reason, $seen, dl, confl)
                     $seen = seen1
+                    (activity2, heap2, hpos2, var_inc2) = Branch.bump_all($activity, $heap, $hpos, touched, $var_inc)
+                    $activity = activity2
+                    $heap = heap2
+                    $hpos = hpos2
+                    $var_inc = var_inc2
+                    old_trail_len = $trail_len
                     (va2, tl2, dl2, q2) = Core.cancel_until($value, $trail, $trail_len, $trail_lim, $dl, bt.to_u64())
+                    (heap3, hpos3, heap_len3) = Branch.reinsert($activity, $heap, $hpos, $heap_len, $trail, tl2, old_trail_len)
                     $value = va2
                     $trail_len = tl2
                     $dl = dl2
                     $qhead = q2
-                    $next_var = 0
+                    $heap = heap3
+                    $hpos = hpos3
+                    $heap_len = heap_len3
                     if proof_on {
                         $bytes = Drat.add_clause($bytes, learnt)
                     }
@@ -281,8 +301,10 @@ Solver :: [].{
                     $bytes = bytes2
                     $traced = traced
                 }
-                v = pick_branch($value, $next_var, num_vars)
-                $next_var = v
+                (heap3, hpos3, heap_len3, v) = Branch.pick($activity, $heap, $hpos, $heap_len, $value, num_vars)
+                $heap = heap3
+                $hpos = hpos3
+                $heap_len = heap_len3
                 if v < num_vars {
                     $trail_lim = Core.put($trail_lim, $dl, $trail_len.to_u32_wrap())
                     $dl = $dl + 1
@@ -298,18 +320,8 @@ Solver :: [].{
                 }
             }
         }
-        scalars = { trail_len: $trail_len, dl: $dl, qhead: $qhead, next_var: $next_var, ok: $ok, conflicts: $conflicts, decisions: $decisions, propagations: $props, proof_on, traced: $traced }
-        ($arena, $pool, $wofs, $wlen, $wcap, $value, $level, $reason, $trail, $trail_lim, $seen, $bytes, scalars, if $status == Sat { Sat } else { Unsat })
-    }
-
-    # The lowest unassigned variable at or after `next_var`, or `num_vars` if none.
-    pick_branch : List(U8), U64, U64 -> U64
-    pick_branch = |value, next_var, num_vars| {
-        var $v = next_var
-        while $v < num_vars and (value.get(2 * $v) ?? 0) != Model.unassigned {
-            $v = $v + 1
-        }
-        $v
+        scalars = { trail_len: $trail_len, dl: $dl, qhead: $qhead, heap_len: $heap_len, var_inc: $var_inc, ok: $ok, conflicts: $conflicts, decisions: $decisions, propagations: $props, proof_on, traced: $traced }
+        ($arena, $pool, $wofs, $wlen, $wcap, $value, $level, $reason, $trail, $trail_lim, $seen, $activity, $heap, $hpos, $bytes, scalars, if $status == Sat { Sat } else { Unsat })
     }
 
     # The assignment after a `Sat` result: every variable is assigned.
@@ -428,12 +440,13 @@ expect {
         if $d < 4 and confl != Core.none { $confl = 1 } else if $d == 4 { $confl = confl }
         $d = $d + 1
     }
-    (seen, learnt, bt) = Analyze.analyze($arena, $trail, $trail_len, $level, $reason, st.seen, 4, $confl)
+    (seen, learnt, bt, touched) = Analyze.analyze($arena, $trail, $trail_len, $level, $reason, st.seen, 4, $confl)
     $confl != Core.none and $confl != 1
     and (learnt.get(0) ?? 0) == lit(7, Bool.False)
     and (learnt.get(1) ?? 0) == lit(3, Bool.False)
     and learnt.len() == 3
     and bt == 3
+    and touched.len() == 4
     and seen.all(|s| s == 0)
 }
 
@@ -461,9 +474,9 @@ expect {
     $ok
 }
 
-# Watch invariants hold along a decision sequence: on 200 seeded random CNFs, decide variables in
-# order and propagate until the first conflict; after every conflict-free propagation no clause is
-# unit or falsified and every watch is in place.
+# Watch invariants hold along an EVSIDS decision sequence on 200 seeded random CNFs. After every
+# conflict-free propagation no clause is unit or falsified, every watch is in place, and the lazy
+# activity heap remains consistent.
 expect {
     var $seed = 1
     var $ok = Bool.True
@@ -479,6 +492,10 @@ expect {
         var $reason = st.reason
         var $trail = st.trail
         var $trail_len = st.search.trail_len
+        var $activity = st.activity
+        var $heap = st.heap
+        var $hpos = st.hpos
+        var $heap_len = st.search.heap_len
         var $qhead = st.search.qhead
         var $dl = 0
         var $go = st.search.ok
@@ -498,8 +515,11 @@ expect {
             if confl != Core.none {
                 $go = Bool.False
             } else {
-                if !Propagate.no_pending_clause($arena, $value) or !Core.watches_consistent($arena, $pool, $wofs, $wlen) { $ok = Bool.False }
-                v = Solver.pick_branch($value, 0, 8)
+                if !Propagate.no_pending_clause($arena, $value) or !Core.watches_consistent($arena, $pool, $wofs, $wlen) or !Branch.consistent($activity, $heap, $hpos, $heap_len) { $ok = Bool.False }
+                (heap1, hpos1, heap_len1, v) = Branch.pick($activity, $heap, $hpos, $heap_len, $value, 8)
+                $heap = heap1
+                $hpos = hpos1
+                $heap_len = heap_len1
                 if v < 8 {
                     $dl = $dl + 1
                     (v1, l1, r1, t1, n1) = Core.assign($value, $level, $reason, $trail, $trail_len, (2 * v + 1).to_u32_wrap(), Core.none, $dl)

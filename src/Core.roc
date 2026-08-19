@@ -7,20 +7,18 @@
 # `[blocker, cref]` at `pool[wofs..]`, relocated to the end of the pool with doubled capacity when
 # full; `pool[0]` is reserved so `wofs = 0` means no block yet.
 #
-# `trail` and `trail_lim` are fixed-capacity buffers (one slot per variable) with explicit
-# lengths in `search`, so the solver never truncates a list: `List.drop_last`/`take_first`
-# results are "maybe shared" to the compiler and any list that flows through them is copied on
-# its next write.
+# `trail`, `trail_lim`, and the variable heap are fixed-capacity buffers (one slot per variable)
+# with explicit live lengths. This keeps the established hot loops on indexed writes; an earlier
+# claim that truncating a list poisons uniqueness no longer reproduces on the pinned compiler.
 #
 # The `State` record exists at the API boundary only. Every function that mutates takes the
 # lists it needs as separate parameters and returns them in a tuple, and the owner loops
 # (`Solver.add_all`, `Solver.search_loop`) hold the lists in `var`s between calls. That is the
 # one shape this compiler reliably keeps in place. Threading the record instead was measured to
-# copy lists in every variant tried: a record parameter is borrowed for the whole call, so a
+# copy lists in the solver's call shapes: a record parameter is borrowed for the whole call, so a
 # callee that mutates one list and passes the rebuilt record on shares the other fields with the
-# caller's copy; a record returned inside a tuple keeps the caller's old record alive; a
-# projection read between destructure and rebuild, a conditional around the call in a loop, or
-# more than 16 fields each break the field-take optimisation. List writes go through `put`.
+# caller's copy; a record returned inside a tuple keeps the caller's old record alive. List writes
+# go through `put`.
 
 import Model
 
@@ -37,15 +35,18 @@ Core :: [].{
         trail : List(U32),
         trail_lim : List(U32),
         seen : List(U8),
+        activity : List(F64),
+        heap : List(U32),
+        hpos : List(U32),
         search : Search,
         stats : Stats,
         proof : Proof,
     }
 
     # `trail_len` assigned literals, `dl` decision levels (`trail_lim[0..dl]` = trail index of each
-    # level's decision), `qhead` = first unpropagated trail index, `next_var` = decision cursor
-    # (lowest possibly unassigned variable), `ok` false once the formula is refuted.
-    Search : { trail_len : U64, dl : U64, qhead : U64, next_var : U64, ok : Bool }
+    # level's decision), `qhead` = first unpropagated trail index. `heap_len` is the live prefix of
+    # the fixed-capacity EVSIDS heap; `var_inc` is the next activity bump amount.
+    Search : { trail_len : U64, dl : U64, qhead : U64, heap_len : U64, var_inc : F64, ok : Bool }
 
     Stats : { conflicts : U64, decisions : U64, propagations : U64 }
 
@@ -67,20 +68,33 @@ Core :: [].{
 
     new : U64 -> State
     new = |n| {
-        arena: [0],
-        pool: [0],
-        wofs: List.repeat(0, 2 * n),
-        wlen: List.repeat(0, 2 * n),
-        wcap: List.repeat(0, 2 * n),
-        value: List.repeat(Model.unassigned, 2 * n),
-        level: List.repeat(0, n),
-        reason: List.repeat(none, n),
-        trail: List.repeat(0, n),
-        trail_lim: List.repeat(0, n),
-        seen: List.repeat(0, n),
-        search: { trail_len: 0, dl: 0, qhead: 0, next_var: 0, ok: Bool.True },
-        stats: { conflicts: 0, decisions: 0, propagations: 0 },
-        proof: { on: Bool.False, bytes: [], traced: 0 },
+        var $heap = List.with_capacity(n)
+        var $hpos = List.with_capacity(n)
+        var $v = 0
+        while $v < n {
+            $heap = $heap.append($v.to_u32_wrap())
+            $hpos = $hpos.append($v.to_u32_wrap())
+            $v = $v + 1
+        }
+        {
+            arena: [0],
+            pool: [0],
+            wofs: List.repeat(0, 2 * n),
+            wlen: List.repeat(0, 2 * n),
+            wcap: List.repeat(0, 2 * n),
+            value: List.repeat(Model.unassigned, 2 * n),
+            level: List.repeat(0, n),
+            reason: List.repeat(none, n),
+            trail: List.repeat(0, n),
+            trail_lim: List.repeat(0, n),
+            seen: List.repeat(0, n),
+            activity: List.repeat(0, n),
+            heap: $heap,
+            hpos: $hpos,
+            search: { trail_len: 0, dl: 0, qhead: 0, heap_len: n, var_inc: 1.0, ok: Bool.True },
+            stats: { conflicts: 0, decisions: 0, propagations: 0 },
+            proof: { on: Bool.False, bytes: [], traced: 0 },
+        }
     }
 
     # In-place write; `list.set(i, x) ?? list` is the shape the compiler keeps in place both
