@@ -2,7 +2,8 @@
 #
 # Literals are `2*var + sign` (`lit ^ 1` negates); a clause reference `cref` is its offset in the
 # arena, with `arena[0]` reserved so `cref = 0` means none. Clause layout: `[header, meta,
-# lits...]`, header bits 0..27 = size, bit 28 = learnt, bit 29 = deleted; the two watched literals
+# lits...]`, header bits 0..27 = size, bit 28 = learnt, bit 29 = deleted; meta bits 0..7 =
+# saturating LBD and bits 8..9 = use age. The two watched literals
 # are the first two. Watch lists (scheme A): every literal owns a block of `wcap` two-word entries
 # `[blocker, cref]` at `pool[wofs..]`, relocated to the end of the pool with doubled capacity when
 # full; `pool[0]` is reserved so `wofs = 0` means no block yet.
@@ -49,7 +50,7 @@ Core :: [].{
     # the fixed-capacity EVSIDS heap; `var_inc` is the next activity bump amount.
     Search : { trail_len : U64, dl : U64, qhead : U64, heap_len : U64, var_inc : F64, ok : Bool }
 
-    Stats : { conflicts : U64, decisions : U64, propagations : U64 }
+    Stats : { conflicts : U64, decisions : U64, propagations : U64, restarts : U64, reductions : U64, collections : U64, deleted_clauses : U64, learnt_literals_before : U64, learnt_literals_after : U64 }
 
     # `traced` = number of level-0 trail literals already emitted as unit lemmas.
     Proof : { on : Bool, bytes : List(U8), traced : U64 }
@@ -66,6 +67,10 @@ Core :: [].{
     learnt_bit = 0x10000000
     deleted_bit : U32
     deleted_bit = 0x20000000
+    glue_mask : U32
+    glue_mask = 0x000000FF
+    used_mask : U32
+    used_mask = 0x00000300
 
     new : U64 -> State
     new = |n| {
@@ -94,7 +99,7 @@ Core :: [].{
             hpos: $hpos,
             phase: List.repeat(1, n),
             search: { trail_len: 0, dl: 0, qhead: 0, heap_len: n, var_inc: 1.0, ok: Bool.True },
-            stats: { conflicts: 0, decisions: 0, propagations: 0 },
+            stats: { conflicts: 0, decisions: 0, propagations: 0, restarts: 0, reductions: 0, collections: 0, deleted_clauses: 0, learnt_literals_before: 0, learnt_literals_after: 0 },
             proof: { on: Bool.False, bytes: [], traced: 0 },
         }
     }
@@ -138,13 +143,55 @@ Core :: [].{
         ($value, start, dl.min(lvl), start)
     }
 
-    # Appends a clause of size >= 2 to the arena and returns its cref.
-    alloc : List(U32), List(U32), Bool -> (List(U32), U32)
-    alloc = |arena, lits, learnt| {
+    # Appends a clause of size >= 2 to the arena and returns its cref. Learned clauses store
+    # saturating LBD in meta bits 0..7 and start with one use in bits 8..9.
+    alloc : List(U32), List(U32), Bool, U32 -> (List(U32), U32)
+    alloc = |arena, lits, learnt, glue| {
         expect lits.len() >= 2
         cref = arena.len().to_u32_wrap()
         header = lits.len().to_u32_wrap().bitwise_or(if learnt { learnt_bit } else { 0 })
-        (arena.append(header).append(0).concat(lits), cref)
+        meta = if learnt { glue.min(255).bitwise_or(0x00000100) } else { 0 }
+        (arena.append(header).append(meta).concat(lits), cref)
+    }
+
+    clause_glue : U32 -> U32
+    clause_glue = |meta| meta.bitwise_and(glue_mask)
+
+    clause_used : U32 -> U32
+    clause_used = |meta| meta.bitwise_and(used_mask).shr_wrap(8)
+
+    # Learned clauses participating in conflict derivation get the maximum use age.
+    mark_used : List(U32), U32 -> List(U32)
+    mark_used = |arena, cref| {
+        c = cref.to_u64()
+        header = arena.get(c) ?? 0
+        if header.bitwise_and(learnt_bit) == 0 {
+            arena
+        } else {
+            meta = arena.get(c + 1) ?? 0
+            put(arena, c + 1, meta.bitwise_and(glue_mask).bitwise_or(used_mask))
+        }
+    }
+
+    mark_used_all : List(U32), List(U32) -> List(U32)
+    mark_used_all = |arena, crefs| {
+        var $arena = arena
+        for cref in crefs { $arena = mark_used($arena, cref) }
+        $arena
+    }
+
+    age_clause : List(U32), U32 -> List(U32)
+    age_clause = |arena, cref| {
+        c = cref.to_u64()
+        meta = arena.get(c + 1) ?? 0
+        used = clause_used(meta)
+        if used == 0 { arena } else { put(arena, c + 1, clause_glue(meta).bitwise_or((used - 1).shl_wrap(8))) }
+    }
+
+    mark_deleted : List(U32), U32 -> List(U32)
+    mark_deleted = |arena, cref| {
+        c = cref.to_u64()
+        put(arena, c, (arena.get(c) ?? 0).bitwise_or(deleted_bit))
     }
 
     push_watch : List(U32), List(U32), List(U32), List(U32), U32, U32, U32 -> (List(U32), List(U32), List(U32), List(U32))
@@ -174,14 +221,41 @@ Core :: [].{
     }
 
     # Stores a clause of size >= 2 in the arena and watches its first two literals.
-    learn : List(U32), List(U32), List(U32), List(U32), List(U32), List(U32), Bool -> (List(U32), List(U32), List(U32), List(U32), List(U32), U32)
-    learn = |arena, pool, wofs, wlen, wcap, lits, learnt| {
-        (arena1, cref) = alloc(arena, lits, learnt)
+    learn : List(U32), List(U32), List(U32), List(U32), List(U32), List(U32), Bool, U32 -> (List(U32), List(U32), List(U32), List(U32), List(U32), U32)
+    learn = |arena, pool, wofs, wlen, wcap, lits, learnt, glue| {
+        (arena1, cref) = alloc(arena, lits, learnt, glue)
         l0 = lits.get(0) ?? 0
         l1 = lits.get(1) ?? 0
         (pool1, wofs1, wlen1, wcap1) = push_watch(pool, wofs, wlen, wcap, l0.bitwise_xor(1), l1, cref)
         (pool2, wofs2, wlen2, wcap2) = push_watch(pool1, wofs1, wlen1, wcap1, l1.bitwise_xor(1), l0, cref)
         (arena1, pool2, wofs2, wlen2, wcap2, cref)
+    }
+
+    # Rebuilds every live clause's watches into fresh pooled blocks, discarding relocation slack
+    # and all watchers of deleted clauses.
+    rebuild_watches : List(U32), U64 -> (List(U32), List(U32), List(U32), List(U32))
+    rebuild_watches = |arena, num_lits| {
+        var $pool = [0]
+        var $wofs = List.repeat(0, num_lits)
+        var $wlen = List.repeat(0, num_lits)
+        var $wcap = List.repeat(0, num_lits)
+        var $c = 1
+        while $c < arena.len() {
+            header = arena.get($c) ?? 0
+            size = clause_size(header)
+            if header.bitwise_and(deleted_bit) == 0 {
+                l0 = arena.get($c + 2) ?? 0
+                l1 = arena.get($c + 3) ?? 0
+                (p1, wo1, wl1, wc1) = push_watch($pool, $wofs, $wlen, $wcap, l0.bitwise_xor(1), l1, $c.to_u32_wrap())
+                (p2, wo2, wl2, wc2) = push_watch(p1, wo1, wl1, wc1, l1.bitwise_xor(1), l0, $c.to_u32_wrap())
+                $pool = p2
+                $wofs = wo2
+                $wlen = wl2
+                $wcap = wc2
+            }
+            $c = $c + 2 + size
+        }
+        ($pool, $wofs, $wlen, $wcap)
     }
 
     # Watch invariant A1: the two watched literals of every live clause are its first two, each
@@ -249,7 +323,7 @@ expect {
     var $wcap = st.wcap
     var $i = 1
     while $i <= 5 {
-        (a, p, wo, wl, wc, _) = Core.learn($arena, $pool, $wofs, $wlen, $wcap, [0, (2 * $i).to_u32_wrap()], Bool.False)
+        (a, p, wo, wl, wc, _) = Core.learn($arena, $pool, $wofs, $wlen, $wcap, [0, (2 * $i).to_u32_wrap()], Bool.False, 0)
         $arena = a
         $pool = p
         $wofs = wo
