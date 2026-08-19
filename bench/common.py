@@ -54,7 +54,7 @@ def resolve_instances(specs):
         else:
             found = sorted(glob.glob(spec))
         if not found:
-            raise SystemExit(f"no instances for {spec!r} (run bench/fetch.sh?)")
+            raise SystemExit(f"no instances for {spec!r} (run bench/fetch.py?)")
         files.extend(found[:limit] if limit else found)
     return files
 

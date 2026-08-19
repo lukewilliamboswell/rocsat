@@ -17,7 +17,7 @@ tools provide the build tools (`xcode-select --install`); on Debian/Ubuntu, inst
 `build-essential git curl ca-certificates`. Then the same commands work on macOS and Linux:
 
     bench/tools.sh     # builds drat-trim, cnfuzz, cnfdd, and dimocheck into bench/tools/
-    bench/fetch.sh     # downloads and normalizes SATLIB into bench/corpus/
+    bench/fetch.py     # downloads and verifies the corpus manifest into bench/corpus/
     make check
 
 PySAT is declared by the fuzz and incremental harnesses and fetched by `uv`. Install `hyperfine`

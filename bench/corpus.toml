@@ -1,0 +1,98 @@
+version = 1
+budget_bytes = 900000000
+
+[[archive]]
+set = "uf20-91"
+family = "random-3sat"
+profiles = ["ternary", "sat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uf20-91.tar.gz"
+sha256 = "be2835295e8500bb28f0314eba70bd0deaff1250b187260f7b6d0772bdf111a5"
+files = 1000
+
+[[archive]]
+set = "uf50-218"
+family = "random-3sat"
+profiles = ["ternary", "sat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uf50-218.tar.gz"
+sha256 = "a40862e52dfdce78620b037254579a02dbda8182d2879433658a4c15cb00327c"
+files = 1000
+
+[[archive]]
+set = "uuf50-218"
+family = "random-3sat"
+profiles = ["ternary", "unsat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uuf50-218.tar.gz"
+sha256 = "24cc9f492673e0f975fecc56b3a4d8ac21c385cc46205d83b7491a787f43e13d"
+files = 1000
+
+[[archive]]
+set = "uf100-430"
+family = "random-3sat"
+profiles = ["ternary", "sat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uf100-430.tar.gz"
+sha256 = "7f691acb8c45790ef8178dd01bb362cf50da608d478be9965599131f0a763e59"
+files = 1000
+
+[[archive]]
+set = "uuf100-430"
+family = "random-3sat"
+profiles = ["ternary", "unsat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uuf100-430.tar.gz"
+sha256 = "736c6f94fecae346a00501b197c482e146b1c6ab05fb6d2e4666e520b8e8508a"
+files = 1000
+
+[[archive]]
+set = "uf250-1065"
+family = "random-3sat"
+profiles = ["ternary", "conflict", "sat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uf250-1065.tar.gz"
+sha256 = "ebe9b90d674bfd4d3cc76ed048f144e2728b1758cb8aac157c7ce38bb1d1931d"
+files = 100
+
+[[archive]]
+set = "uuf250-1065"
+family = "random-3sat"
+profiles = ["ternary", "conflict", "unsat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uuf250-1065.tar.gz"
+sha256 = "1b6d59619e3c805947c5602703ff3190dfbfeff55d6cb62187838668b0fd4126"
+files = 100
+
+[[archive]]
+set = "flat200-479"
+family = "graph-coloring"
+profiles = ["combinatorial", "sat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/GCP/flat200-479.tar.gz"
+sha256 = "a27f57132377dc6be4fd11a938c78e6ec245e65fb33fa7a86579ef986c7c242b"
+files = 100
+
+[[archive]]
+set = "hole"
+family = "pigeonhole"
+profiles = ["crafted", "conflict", "unsat-proof"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/PHOLE/pigeon-hole.tar.gz"
+sha256 = "092c4682d1a9d25451e8661af0afa3635943173b07164db495f4f0e11e806ee0"
+files = 5
+
+[[archive]]
+set = "dubois"
+family = "dubois"
+profiles = ["crafted", "conflict", "unsat-proof"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/DUBOIS/dubois.tar.gz"
+sha256 = "c0ffe431d4b3fc69226f5f5e0444068d5619642f18f8e4f8c8023c24c9ef263c"
+files = 13
+
+[[archive]]
+set = "pret"
+family = "pret"
+profiles = ["crafted", "unsat-proof"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/PRET/pret.tar.gz"
+sha256 = "22719743d775f844c73d51b5255c6945ac77c86b6e9205aa718d714ce0006ef2"
+files = 8
+
+[[archive]]
+set = "aim"
+family = "aim"
+profiles = ["crafted", "sat-unsat"]
+url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/DIMACS/AIM/aim.tar.gz"
+sha256 = "7e4e0076fdd840ed7bcc80c475509ed7726608b010cd3f181d503fe337473c85"
+files = 72
