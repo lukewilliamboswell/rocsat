@@ -104,8 +104,9 @@ Performance tiers are separate from `make check` and always run serially:
   acceptance run took 12 minutes 51 seconds for rocsat.
 
 Benchmark timeouts mean *unsolved*, not failure; crashes, wrong known statuses, and invalid SAT
-models still fail. `--rss` samples direct-process peak RSS on Linux and JSON preserves solver
-counters. Compare two runs with:
+models still fail. `--rss` samples aggregate process-tree peak RSS on Linux every five milliseconds,
+so adapter children are included (very short-lived children can finish between samples). JSON
+preserves solver counters. Compare two runs with:
 
 ```
 uv run --script bench/compare.py baseline.json candidate.json --json comparison.json

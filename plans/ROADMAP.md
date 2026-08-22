@@ -67,6 +67,7 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 - Reporting upstream is closed. `make check` remains the commit gate and `make canary` is required
   for hot storage or API changes. Use `make perf-smoke` for measured implementation increments and
   `make perf-diverse` before accepting heuristic changes; both tiers are serial and outside CI.
+  Linux RSS now covers adapter descendants; pre-2026-08-22 adapter RSS is not comparable.
 
 ## Log
 
@@ -95,3 +96,6 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 - 2026-08-22 — consuming CNF loading complete: `add_all` removes each nested clause from its outer
   list before normalization. Ten diversity cases saved more than 1 MiB of peak RSS, including
   145 MiB on equivalence checking and 122 MiB on sudoku; solved count and search stayed identical.
+- 2026-08-22 — Linux RSS sampling now aggregates the benchmark leader and its descendants, with a
+  regression test for allocating adapter children. MiniSat smoke peaks are now plausible (up to
+  59 MiB instead of the wrapper shell's 1.4 MiB); short children remain sampling-granularity limited.
