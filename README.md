@@ -20,9 +20,10 @@ nightlies must be revalidated against known ownership/code-generation sensitivit
 ## Toolchain
 
 The compiler is pinned in `roc-version`; `scripts/roc` runs that exact nightly from
-`~/.roc/<tag>/roc` (or `$ROC_BIN`) and never a `roc` found on `PATH`. To install it, download the
-tarball for your platform from `https://github.com/roc-lang/nightlies/releases/tag/<tag>` and
-extract it so that `~/.roc/<tag>/roc` exists.
+`~/.roc/<tag>/roc` (or `$ROC_BIN`) and never a `roc` found on `PATH`. On Linux or macOS,
+`scripts/install-roc` downloads the matching release asset, verifies its committed SHA-256, and
+installs it there. The same archives are available manually from
+`https://github.com/roc-lang/nightlies/releases/tag/<tag>`.
 
 For the test harness, install `git`, `make`, `gcc`, `curl`, `tar`, and
 [`uv`](https://docs.astral.sh/uv/getting-started/installation/). On macOS, the Xcode command-line
@@ -61,7 +62,9 @@ src/rocsat solve /tmp/unsat.cnf /tmp/unsat.drat
     make build         # --opt=speed  -> src/rocsat
     make build-dev     # --opt=dev    -> src/rocsat-dev (keeps inline `expect`s)
     make test          # roc test over src/
-    make check         # test + regression + incremental differential + 30 s fuzz; commit gate
+    make api-check     # build and run examples/api-consumer.roc as a separate application
+    make source-check  # CI gate: source tests, harness tests, API consumer, build, version
+    make check         # source/API tests + regression + incremental differential + 30 s fuzz
     make canary        # timing canary: ns/clause on a 2 M contradictory implication chain
     make perf-smoke    # 40 serial representatives, 2 s cap, JSON under bench/out/
     make perf-diverse  # 112 serial representatives, 10 s cap, JSON under bench/out/
@@ -161,6 +164,7 @@ normal regression gate continues to check every UNSAT proof.
 ## Layout
 
 - `src/` — the Roc app (`main.roc`) and solver modules
+- `examples/api-consumer.roc` — separately compiled public-module contract example
 - `bench/` — harness: `run.py` (instance sets, model/proof checks, PAR-2), `fuzz.py`,
   `incremental.py` (fresh-PySAT sequence differential), `fetch.py`/`corpus.toml` (hash-pinned
   corpus), `profile.py`, `compare.py`, `expected.py` (reference statuses in `bench/expected/`),
@@ -170,4 +174,6 @@ normal regression gate continues to check every UNSAT proof.
 - `research/`, `roc-docs/`, `spike/` — background material, frozen
 - `upstream/` — verified reproducers for the compiler and toolchain problems this project hit,
   one directory per issue; `upstream/README.md` tracks filed reports and pending drafts
+- `scripts/` — pinned compiler installer/launcher and the external API-consumer check
+- `.github/workflows/check.yml` — clean Linux source/API validation using the compiler pin
 - `plans/` — local planning documents; only `ROADMAP.md` is committed

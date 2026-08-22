@@ -1,0 +1,12 @@
+#!/bin/sh
+# Build and run the public API example as a separate app with a vendored source-module snapshot.
+set -eu
+root=$(cd "$(dirname "$0")/.." && pwd)
+mkdir -p "$root/.roc-cache"
+tmp=$(mktemp -d "$root/.roc-cache/api-consumer.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+
+cp "$root"/src/*.roc "$tmp"/
+cp "$root/examples/api-consumer.roc" "$tmp/main.roc"
+"$root/scripts/roc" build --opt=dev --output="$tmp/consumer" "$tmp/main.roc"
+"$tmp/consumer"
