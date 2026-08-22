@@ -48,8 +48,10 @@ on the nightly suite; revisit those shapes only after the design constraints rec
 - [x] Compact diversity suite: 5,680 hash-pinned CNFs / 532 MiB, including 24 SATLIB/classic
       sets and 81 distinct known-result Competition 2025 families; serial smoke/diversity tiers,
       PAR-2/JSON comparison, solver counters, and Linux RSS
-- [ ] Long-running infrastructure: one-hour `runcnfuzz`, repeated min-of-N whole-suite baselines,
-      and optional larger competition instances when a compact representative misses a load shape
+- [x] Long-running correctness: fixed-seed one-hour small-CNF campaign with the in-tree generator
+      and `cnfuzz`, checking PySAT status, SAT models, DRAT proofs, and dev-build propagation expects
+- [ ] Repeated min-of-N whole-suite baselines and optional larger competition instances when a
+      compact representative misses a load shape
 - [x] Upstream reports: eight verified reproducers in `upstream/`; issues 01, 02, and 05 were
       filed as roc#10848, roc#10847, and roc#10849, and the remaining findings were raised in Roc
       forum discussions/comments. Reporting is closed for this project. Nominal method dispatch
@@ -83,6 +85,8 @@ on the nightly suite; revisit those shapes only after the design constraints rec
 - Serial 1-second SATLIB counts on the final host are rocsat 57/100 uf250, 8/100 uuf250, and
   100/100 flat200, versus MiniSat 82/100, 13/100, and 100/100. The roadmap's absolute all-uf250
   target was unrealistic on this host, but the relative solved-count target passes.
+- Release-candidate long fuzz is clean: 48,686 generated formulas in 3,600 seconds with seed
+  1787410000, checking PySAT status, SAT models, UNSAT DRAT proofs, and dev-build expects.
 - Reporting upstream is closed. `make check` remains the commit gate and `make canary` is required
   for hot storage or API changes. Use `make perf-smoke` for measured implementation increments and
   `make perf-diverse` before accepting heuristic changes; both tiers are serial and outside CI.
@@ -125,3 +129,5 @@ on the nightly suite; revisit those shapes only after the design constraints rec
   complexity without speed, bounded subsumption/SSR missed the hardware gap, and saved watch
   cursors traded a set-covering gain for suite regressions. No solver code was retained; the final
   correctness gate passed on the restored baseline.
+- 2026-08-22 — the fixed-seed 0.1.0 long-fuzz gate completed 48,686 small formulas in one hour with
+  no status, model, DRAT proof, or dev-build invariant failure (seed 1787410000).
