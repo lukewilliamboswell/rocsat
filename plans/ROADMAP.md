@@ -64,8 +64,12 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 - The three 10-second diversity solves unique to simplifying MiniSat are not evidence for restart
   tuning. At 60 seconds, rocsat solved multiplier circuits in 18.9 s and set covering in 17.5 s;
   non-simplifying MiniSat timed out on multiplier circuits and hardware model checking, while taking
-  10.2 s on binary-heavy set covering. Preprocessing explains the two hardware gaps; set covering is
-  the useful propagation/search comparison for a binary-watcher experiment.
+  10.2 s on binary-heavy set covering. Preprocessing explains the two hardware gaps.
+- Tagged binary watchers, incremental-safe subsumption/strengthening, and saved watch cursors were
+  implemented and measured on the pinned compiler, then fully reverted. Watch tagging did not
+  improve set covering; preprocessing did not reproduce MiniSat's hardware gain; original-only
+  cursors improved set covering to 14.9 s but regressed common smoke timing by 9.6%. The retained
+  plan records all candidates and guards against repeating these shapes without a design change.
 - Serial 1-second SATLIB counts on the final host are rocsat 57/100 uf250, 8/100 uuf250, and
   100/100 flat200, versus MiniSat 82/100, 13/100, and 100/100. The roadmap's absolute all-uf250
   target was unrealistic on this host, but the relative solved-count target passes.
@@ -107,3 +111,7 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 - 2026-08-22 — extended the three simplifying-MiniSat-only diversity cases to 60 seconds and built
   MiniSat core as a control. Its two hardware timeouts isolate preprocessing—not restart policy—as
   the major gap; binary-heavy set covering remains a measured engine optimization target.
+- 2026-08-22 — evaluated and rejected three milestone-5 shapes: tagged binary reasons spread
+  complexity without speed, bounded subsumption/SSR missed the hardware gap, and saved watch
+  cursors traded a set-covering gain for suite regressions. No solver code was retained; the final
+  correctness gate passed on the restored baseline.
