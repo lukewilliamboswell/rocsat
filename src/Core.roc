@@ -6,7 +6,8 @@
 # saturating LBD and bits 8..9 = use age. The two watched literals
 # are the first two. Watch lists (scheme A): every literal owns a block of `wcap` two-word entries
 # `[blocker, cref]` at `pool[wofs..]`, relocated to the end of the pool with doubled capacity when
-# full; `pool[0]` is reserved so `wofs = 0` means no block yet.
+# full; `pool[0..7]` is a reusable zero seed, real blocks start after it, and `wofs = 0` means no
+# block yet. Copying that seed grows a first block without allocating a temporary list.
 #
 # `trail` and the variable heap are fixed-capacity buffers (one slot per variable) with explicit
 # live lengths. `trail_lim` starts at that capacity and grows at the cold solve boundary when dummy
@@ -86,7 +87,7 @@ Core :: [].{
         }
         {
             arena: [0],
-            pool: [0],
+            pool: List.repeat(0, 8),
             wofs: List.repeat(0, 2 * n),
             wlen: List.repeat(0, 2 * n),
             wcap: List.repeat(0, 2 * n),
@@ -224,7 +225,7 @@ Core :: [].{
                         live = pool.append_range_within(oldofs, 2 * n) ?? pool
                         live.append_range_within(newofs, 2 * (newcap - n)) ?? live
                     } else {
-                        pool.concat(List.repeat(0, 2 * newcap))
+                        pool.append_range_within(0, 2 * newcap) ?? pool
                     }
                 (grown, put(wofs, l, newofs.to_u32_wrap()), put(wcap, l, newcap.to_u32_wrap()))
             } else {
@@ -250,7 +251,7 @@ Core :: [].{
     # and all watchers of deleted clauses.
     rebuild_watches : List(U32), U64 -> (List(U32), List(U32), List(U32), List(U32))
     rebuild_watches = |arena, num_lits| {
-        var $pool = [0]
+        var $pool = List.repeat(0, 8)
         var $wofs = List.repeat(0, num_lits)
         var $wlen = List.repeat(0, num_lits)
         var $wcap = List.repeat(0, num_lits)
