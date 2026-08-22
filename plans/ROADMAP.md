@@ -61,6 +61,11 @@ the first place clauses get deleted. The end product is a library with a CLI fro
   incremental clause addition, assumptions, SAT inspection, phase control, and failed-assumption
   conflicts over the existing deterministic EVSIDS/Luby/lifecycle engine. The next solver work is
   selected from milestone 5+; check `plans/simplify-backlog.md` before touching `Core`.
+- The three 10-second diversity solves unique to simplifying MiniSat are not evidence for restart
+  tuning. At 60 seconds, rocsat solved multiplier circuits in 18.9 s and set covering in 17.5 s;
+  non-simplifying MiniSat timed out on multiplier circuits and hardware model checking, while taking
+  10.2 s on binary-heavy set covering. Preprocessing explains the two hardware gaps; set covering is
+  the useful propagation/search comparison for a binary-watcher experiment.
 - Serial 1-second SATLIB counts on the final host are rocsat 57/100 uf250, 8/100 uuf250, and
   100/100 flat200, versus MiniSat 82/100, 13/100, and 100/100. The roadmap's absolute all-uf250
   target was unrealistic on this host, but the relative solved-count target passes.
@@ -99,3 +104,6 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 - 2026-08-22 — Linux RSS sampling now aggregates the benchmark leader and its descendants, with a
   regression test for allocating adapter children. MiniSat smoke peaks are now plausible (up to
   59 MiB instead of the wrapper shell's 1.4 MiB); short children remain sampling-granularity limited.
+- 2026-08-22 — extended the three simplifying-MiniSat-only diversity cases to 60 seconds and built
+  MiniSat core as a control. Its two hardware timeouts isolate preprocessing—not restart policy—as
+  the major gap; binary-heavy set covering remains a measured engine optimization target.
