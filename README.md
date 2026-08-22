@@ -5,6 +5,18 @@ The reusable solver is exposed through the signed-literal `Rocsat` module and a 
 app. Progress is tracked in `plans/ROADMAP.md`; durable implementation rationale lives in
 `DESIGN.md`, and the underlying design research lives in `research/`.
 
+## Status
+
+Version 0.1.0 is the first source-release candidate. The Phase 1 solver is complete: it produces
+checked SAT models and text DRAT proofs, supports persistent incremental clauses and assumptions,
+and keeps its learned database bounded. The remaining solver roadmap is measured post-release
+research, not missing release functionality.
+
+Rocsat is an experimental solver and a substantial exercise of Roc's new compiler, not a claim to
+replace mature native competition solvers. Search is deterministic, but performance and the source
+API may change before 1.0. Builds use the exact compiler nightly in `roc-version` because newer
+nightlies must be revalidated against known ownership/code-generation sensitivities.
+
 ## Toolchain
 
 The compiler is pinned in `roc-version`; `scripts/roc` runs that exact nightly from
@@ -24,6 +36,25 @@ tools provide the build tools (`xcode-select --install`); on Debian/Ubuntu, inst
 PySAT is declared by the fuzz and incremental harnesses and fetched by `uv`. Install `hyperfine`
 for the timing canary (`make canary`). CaDiCaL is only required to regenerate the committed reference statuses
 with `bench/expected.py`; Kissat and MiniSat are optional comparison solvers.
+
+## Quick start
+
+After installing the pinned compiler:
+
+```sh
+make build
+printf 'p cnf 2 2\n1 2 0\n-1 0\n' > /tmp/example.cnf
+src/rocsat solve /tmp/example.cnf
+# `solve` prints a model and exits 10, the SAT Competition success code.
+```
+
+For an UNSAT formula and checked text proof:
+
+```sh
+printf 'p cnf 1 2\n1 0\n-1 0\n' > /tmp/unsat.cnf
+src/rocsat solve /tmp/unsat.cnf /tmp/unsat.drat
+# Exit 20 is the standard successful UNSAT result.
+```
 
 ## Building and checking
 
@@ -72,6 +103,17 @@ p rocsat
 Each query prints `s SATISFIABLE` plus `v` lines, or `s UNSATISFIABLE` plus a `u` line containing
 the final-conflict clause. This `+`/`?` protocol supports interleaved additions and is deliberately
 not called standard INCCNF. Text DRAT output remains a one-shot/global-UNSAT facility.
+
+### Scope and limitations
+
+- The CLI reads DIMACS and incremental transcripts from files; it does not currently read CNF from
+  standard input.
+- Proof output is text DRAT for one-shot/global UNSAT solving. Incremental assumption conflicts are
+  exposed as failed-assumption clauses, not proof streams.
+- The engine deliberately has no variable-elimination preprocessor. Such elimination would need
+  model reconstruction and revival semantics for later incremental clauses.
+- The checked-in `Rocsat` module is the reusable source boundary. A separately compiled consumer
+  test guards that boundary; no stable package registry release or C ABI is promised for 0.1.0.
 
 Solver structure (`src/`): `Rocsat` (public incremental facade), `Core` (state record, arena,
 watch pool, trail primitives), `Propagate` (2WL unit propagation), `Analyze` (1-UIP and recursive minimization), `Branch` (deterministic

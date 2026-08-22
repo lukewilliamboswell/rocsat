@@ -31,7 +31,17 @@ the first place clauses get deleted. The end product is a library with a CLI fro
 | 2 | VSIDS heap, phase saving, Luby restarts | uf250 each < 1 s; flat200 each < 1 s; ≤ 2× MiniSat solved-count on 50 mixed instances | [x] (absolute uf250 target misses; comparison target passes) |
 | 3 | Recursive clause minimisation, LBD, reduceDB with tiers, arena GC, watch-pool rebuild with slack, level-0 simplify | ≥ 25 % fewer learned literals on uuf250; 30-min run keeps arena ≤ 1.2× live and RSS bounded; proofs still verify | [x] |
 | 4 | Library API: assumptions, incremental clause adding, `final_conflict`, IPASIR-shaped surface; CLI becomes a thin client of it | 10 000 random incremental cases agree with one-shot solve (PySAT differential); cores genuinely infeasible | [x] |
-| 5+ | Later list: binary DRAT, binary-clause inline watchers, glue-EMA + stable/focused restarts, VMTF, trail reuse, saved watch position, chronological backtracking, preprocessing | each measured on the nightly suite | [ ] |
+
+Phase 1 is complete. Rocsat's first release does not depend on implementing every modern SAT
+heuristic after the accepted, reusable solver exists.
+
+## Post-release solver research
+
+Binary DRAT, binary-clause inline watchers, glue-EMA plus stable/focused restarts, VMTF, trail
+reuse, saved watch positions, chronological backtracking, and stronger preprocessing remain a
+measured experiment backlog, not an unfinished release milestone. Tagged binary watchers, bounded
+subsumption/self-subsuming strengthening, and saved watch positions were implemented and rejected
+on the nightly suite; revisit those shapes only after the design constraints recorded below change.
 
 ## Phase 2 — infrastructure (grows alongside)
 
@@ -57,10 +67,10 @@ the first place clauses get deleted. The end product is a library with a CLI fro
   releasing storage progressively and making the clause unique for sorting. Selected large-formula
   peaks fell 10–28% (up to 145 MiB); the suite maximum remained 615 MiB where search, not loading,
   dominates. Diversity retained 38/112 solves and identical search without timing regressions.
-- Milestones 2–4 are complete. `Rocsat` now provides signed literals, dynamic variables,
+- Phase 1 milestones 0–4 are complete. `Rocsat` now provides signed literals, dynamic variables,
   incremental clause addition, assumptions, SAT inspection, phase control, and failed-assumption
-  conflicts over the existing deterministic EVSIDS/Luby/lifecycle engine. The next solver work is
-  selected from milestone 5+; check `plans/simplify-backlog.md` before touching `Core`.
+  conflicts over the existing deterministic EVSIDS/Luby/lifecycle engine. Further solver work is
+  post-release measured research; check `plans/simplify-backlog.md` before touching `Core`.
 - The three 10-second diversity solves unique to simplifying MiniSat are not evidence for restart
   tuning. At 60 seconds, rocsat solved multiplier circuits in 18.9 s and set covering in 17.5 s;
   non-simplifying MiniSat timed out on multiplier circuits and hardware model checking, while taking
