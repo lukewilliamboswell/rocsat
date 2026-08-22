@@ -3,7 +3,8 @@
 A CDCL SAT solver written in [Roc](https://www.roc-lang.org) with the new Zig-based compiler.
 The reusable solver is exposed through the signed-literal `Rocsat` module and a thin command-line
 app. Progress is tracked in `plans/ROADMAP.md`; durable implementation rationale lives in
-`DESIGN.md`, and the underlying design research lives in `research/`.
+`DESIGN.md`, and the underlying design research lives in `research/`. Rocsat is licensed under the
+[Apache License 2.0](LICENSE).
 
 ## Status
 
@@ -177,3 +178,7 @@ normal regression gate continues to check every UNSAT proof.
 - `scripts/` — pinned compiler installer/launcher and the external API-consumer check
 - `.github/workflows/check.yml` — clean Linux source/API validation using the compiler pin
 - `plans/` — local planning documents; only `ROADMAP.md` is committed
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).

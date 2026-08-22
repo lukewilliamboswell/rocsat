@@ -87,6 +87,10 @@ on the nightly suite; revisit those shapes only after the design constraints rec
   target was unrealistic on this host, but the relative solved-count target passes.
 - Release-candidate long fuzz is clean: 48,686 generated formulas in 3,600 seconds with seed
   1787410000, checking PySAT status, SAT models, UNSAT DRAT proofs, and dev-build expects.
+- The 0.1.0 source release is ready for a tag: Apache-2.0 licensing, a separately compiled public API
+  consumer, checksum-pinned compiler installation, and clean Linux source CI are present. Final
+  gates passed with canary 190.0 ns/clause and smoke 21/40, PAR-2 86.66 s, 0.9994× common-solved
+  geomean versus baseline, and no regressions.
 - Reporting upstream is closed. `make check` remains the commit gate and `make canary` is required
   for hot storage or API changes. Use `make perf-smoke` for measured implementation increments and
   `make perf-diverse` before accepting heuristic changes; both tiers are serial and outside CI.
@@ -131,3 +135,6 @@ on the nightly suite; revisit those shapes only after the design constraints rec
   correctness gate passed on the restored baseline.
 - 2026-08-22 — the fixed-seed 0.1.0 long-fuzz gate completed 48,686 small formulas in one hour with
   no status, model, DRAT proof, or dev-build invariant failure (seed 1787410000).
+- 2026-08-22 — prepared the 0.1.0 source release under Apache-2.0: external API-consumer compilation,
+  checksum-pinned compiler installation, clean Linux CI, `make check`, canary, and smoke all pass.
+  No solver behavior changed; final smoke retained 21/40 with no measured regression.
