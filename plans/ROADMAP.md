@@ -52,8 +52,11 @@ the first place clauses get deleted. The end product is a library with a CLI fro
   issue roc#10848 is fixed and a canary confirms record threading is safe.
 - The first storage simplification replaced every first-watch temporary allocation with one
   reusable zero seed. The canary improved from 238.0 to 178.6 ns/clause; full diversity retained
-  38/112 solves with identical search and no timing regressions. Peak RSS was unchanged, and the
-  remaining one-shot CNF materialization cost is recorded in `plans/simplify-backlog.md`.
+  38/112 solves with identical search and no timing regressions.
+- One-shot loading now moves each nested input clause out of the parser list before normalization,
+  releasing storage progressively and making the clause unique for sorting. Selected large-formula
+  peaks fell 10–28% (up to 145 MiB); the suite maximum remained 615 MiB where search, not loading,
+  dominates. Diversity retained 38/112 solves and identical search without timing regressions.
 - Milestones 2–4 are complete. `Rocsat` now provides signed literals, dynamic variables,
   incremental clause addition, assumptions, SAT inspection, phase control, and failed-assumption
   conflicts over the existing deterministic EVSIDS/Luby/lifecycle engine. The next solver work is
@@ -89,3 +92,6 @@ the first place clauses get deleted. The end product is a library with a CLI fro
   seed instead of allocating temporary lists. The canary improved 25%; smoke and diversity retained
   solved counts with no regressions, while unchanged RSS isolated CNF materialization as separate
   follow-up work.
+- 2026-08-22 — consuming CNF loading complete: `add_all` removes each nested clause from its outer
+  list before normalization. Ten diversity cases saved more than 1 MiB of peak RSS, including
+  145 MiB on equivalence checking and 122 MiB on sudoku; solved count and search stayed identical.
