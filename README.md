@@ -2,7 +2,8 @@
 
 A CDCL SAT solver written in [Roc](https://www.roc-lang.org) with the new Zig-based compiler.
 The reusable solver is exposed through the signed-literal `Rocsat` module and a thin command-line
-app. Progress is tracked in `plans/ROADMAP.md`, and its design notes live in `research/`.
+app. Progress is tracked in `plans/ROADMAP.md`; durable implementation rationale lives in
+`DESIGN.md`, and the underlying design research lives in `research/`.
 
 ## Toolchain
 
@@ -122,6 +123,7 @@ normal regression gate continues to check every UNSAT proof.
   corpus), `profile.py`, `compare.py`, `expected.py` (reference statuses in `bench/expected/`),
   performance manifests, `regression.txt`, and `canary.sh`
 - `tests/edge/` — hand-written edge-case CNFs
+- `DESIGN.md` — durable implementation choices and measured tuning rationale
 - `research/`, `roc-docs/`, `spike/` — background material, frozen
 - `upstream/` — verified reproducers for the compiler and toolchain problems this project hit,
   one directory per issue; `upstream/README.md` tracks filed reports and pending drafts
