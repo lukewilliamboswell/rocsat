@@ -161,8 +161,39 @@ def run(cmd, timeout, stdin_bytes=None, cwd=None):
         return None, stdout, stderr, time.perf_counter() - started
 
 
+def _process_tree_rss(root_pid):
+    """Current aggregate RSS and largest member HWM in KiB, or None without Linux procfs."""
+    pending = [root_pid]
+    seen = set()
+    current_kib = 0
+    largest_hwm_kib = 0
+    found = False
+    while pending:
+        pid = pending.pop()
+        if pid in seen:
+            continue
+        seen.add(pid)
+        try:
+            children = Path(f"/proc/{pid}/task/{pid}/children").read_text()
+            pending.extend(int(child) for child in children.split())
+            status = Path(f"/proc/{pid}/status").read_text()
+        except (FileNotFoundError, PermissionError, ProcessLookupError, ValueError):
+            continue
+        rss_kib = 0
+        hwm_kib = 0
+        for line in status.splitlines():
+            if line.startswith("VmRSS:"):
+                rss_kib = int(line.split()[1])
+            elif line.startswith("VmHWM:"):
+                hwm_kib = int(line.split()[1])
+        current_kib += rss_kib
+        largest_hwm_kib = max(largest_hwm_kib, hwm_kib)
+        found = True
+    return (current_kib, largest_hwm_kib) if found else None
+
+
 def run_measured(cmd, timeout, cwd=None):
-    """Runs a command with a timeout and samples peak RSS from Linux procfs.
+    """Runs a command with a timeout and samples peak process-tree RSS from Linux procfs.
 
     Output goes to temporary files so a large SAT model cannot block while the parent samples.
     Returns the same fields as `run`, plus peak RSS in KiB (or None off Linux).
@@ -173,14 +204,11 @@ def run_measured(cmd, timeout, cwd=None):
         peak_kib = None
         timed_out = False
         while True:
-            try:
-                status = Path(f"/proc/{process.pid}/status").read_text()
-                for line in status.splitlines():
-                    if line.startswith(("VmHWM:", "VmRSS:")):
-                        value = int(line.split()[1])
-                        peak_kib = value if peak_kib is None else max(peak_kib, value)
-            except (FileNotFoundError, PermissionError, ValueError):
-                pass
+            sample = _process_tree_rss(process.pid)
+            if sample is not None:
+                current_kib, largest_hwm_kib = sample
+                observed_kib = max(current_kib, largest_hwm_kib)
+                peak_kib = observed_kib if peak_kib is None else max(peak_kib, observed_kib)
             if process.poll() is not None:
                 break
             if time.perf_counter() - started >= timeout:

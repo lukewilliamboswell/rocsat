@@ -138,6 +138,25 @@ class RunnerTests(unittest.TestCase):
             self.assertIsNone(rc)
             self.assertFalse(marker.exists())
 
+    def test_measured_rss_includes_adapter_child(self):
+        Path(common.OUT).mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=common.OUT) as tmp:
+            root = Path(tmp)
+            child = root / "allocate.py"
+            child.write_text("""import time
+data = bytearray(32 * 1024 * 1024)
+for index in range(0, len(data), 4096):
+    data[index] = 1
+time.sleep(0.1)
+""")
+            adapter = root / "adapter.sh"
+            adapter.write_text(f"#!/bin/sh\n'{sys.executable}' '{child}'\n")
+            adapter.chmod(0o755)
+            rc, _, _, _, peak_kib = common.run_measured([str(adapter)], 1)
+            self.assertEqual(rc, 0)
+            self.assertIsNotNone(peak_kib)
+            self.assertGreater(peak_kib, 24 * 1024)
+
     def test_model_and_solver_statistics_are_independent(self):
         with tempfile.TemporaryDirectory() as tmp:
             cnf = Path(tmp) / "x.cnf"
