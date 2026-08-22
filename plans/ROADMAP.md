@@ -46,10 +46,14 @@ the first place clauses get deleted. The end product is a library with a CLI fro
       cost was re-measured and withdrawn; the monotonic clock is a basic-cli request.
 - [ ] Simplification passes when `plans/simplify-backlog.md` clusters around one area
 
-## Current handoff (2026-08-19)
+## Current handoff (2026-08-22)
 
 - The pinned compiler remains `nightly-2026-08-18-e9be50a`. Keep the list-threaded hot APIs until
   issue roc#10848 is fixed and a canary confirms record threading is safe.
+- The first storage simplification replaced every first-watch temporary allocation with one
+  reusable zero seed. The canary improved from 238.0 to 178.6 ns/clause; full diversity retained
+  38/112 solves with identical search and no timing regressions. Peak RSS was unchanged, and the
+  remaining one-shot CNF materialization cost is recorded in `plans/simplify-backlog.md`.
 - Milestones 2–4 are complete. `Rocsat` now provides signed literals, dynamic variables,
   incremental clause addition, assumptions, SAT inspection, phase control, and failed-assumption
   conflicts over the existing deterministic EVSIDS/Luby/lifecycle engine. The next solver work is
@@ -81,3 +85,7 @@ the first place clauses get deleted. The end product is a library with a CLI fro
   900 MB budget; 81 compact competition families broaden the existing classic corpus to 532 MiB;
   serial smoke/diversity runs distinguish timeouts from invalid answers and report PAR-2, RSS,
   solver counters, and JSON deltas.
+- 2026-08-22 — watch-pool allocation simplification complete: first blocks copy one reusable zero
+  seed instead of allocating temporary lists. The canary improved 25%; smoke and diversity retained
+  solved counts with no regressions, while unchanged RSS isolated CNF materialization as separate
+  follow-up work.

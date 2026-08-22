@@ -1,6 +1,6 @@
 # Text DRAT proof lines appended to a byte buffer: `l1 l2 ... 0` adds a clause, `d l1 ... 0`
 # deletes one, and a bare `0` is the empty clause. Literals are written as DIMACS integers.
-# Build each line separately: this pinned compiler corrupts a long-lived buffer grown byte by byte.
+# Keep long-lived proof-buffer growth to one concatenation per line.
 
 Drat :: [].{
     add_clause : List(U8), List(U32) -> List(U8)
