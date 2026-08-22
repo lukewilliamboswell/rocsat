@@ -95,7 +95,14 @@ Solver :: [].{
         var $props = sc.propagations
         var $bytes = bytes
         var $traced = sc.traced
-        for lits in clauses {
+        var $clauses = clauses
+        var $clause_i = 0
+        while $clause_i < $clauses.len() {
+            # Move the clause out of the outer list before normalization so sorting can consume it.
+            removed = $clauses.replace($clause_i, []) ?? { list: $clauses, prev: [] }
+            $clauses = removed.list
+            lits = removed.prev
+            $clause_i = $clause_i + 1
             if $ok {
                 match simplify($value, lits) {
                     Skip => {}
