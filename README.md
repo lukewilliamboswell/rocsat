@@ -163,7 +163,12 @@ preserves solver counters. Compare two runs with:
 uv run --script bench/compare.py baseline.json candidate.json --json comparison.json
 ```
 
-`bench/minisat.sh` adapts a local MiniSat (`MINISAT_BIN=/path/to/minisat`) to the same output.
+`bench/minisat.sh` adapts a local MiniSat (`MINISAT_BIN=/path/to/minisat`), whose model is
+reported separately, and `bench/competition.sh` runs any solver that already emits competition
+output (`SOLVER_BIN=/path/to/kissat`, likewise CaDiCaL). Both wrappers cost a few milliseconds
+per instance that rocsat, invoked directly, does not pay, so per-instance time ratios against an
+adapted solver are unreliable below roughly 100 ms; solved counts and PAR-2 at second-scale
+timeouts are unaffected.
 Performance runs deliberately omit proofs because proof size is not bounded by input size; the
 normal regression gate continues to check every UNSAT proof.
 
