@@ -31,11 +31,11 @@ beside the executable.
 For the test harness, install `git`, `make`, `gcc`, `curl`, `tar`, and
 [`uv`](https://docs.astral.sh/uv/getting-started/installation/). On macOS, the Xcode command-line
 tools provide the build tools (`xcode-select --install`); on Debian/Ubuntu, install
-`build-essential git curl ca-certificates`. Then the same commands work on macOS and Linux:
+`build-essential git curl ca-certificates`. Two one-time steps then prepare it, the same way on
+macOS and Linux:
 
     bench/tools.sh     # builds drat-trim, cnfuzz, cnfdd, and dimocheck into bench/tools/
     bench/fetch.py     # downloads and verifies the corpus manifest into bench/corpus/
-    make check
 
 PySAT is declared by the fuzz and incremental harnesses and fetched by `uv`. Install `hyperfine`
 for the timing canary (`make canary`). CaDiCaL is only required to regenerate the committed reference statuses
@@ -71,6 +71,9 @@ src/rocsat solve /tmp/unsat.cnf /tmp/unsat.drat
     make canary        # timing canary: ns/clause on a 2 M contradictory implication chain
     make perf-smoke    # 40 serial representatives, 2 s cap, JSON under bench/out/
     make perf-diverse  # 112 serial representatives, 10 s cap, JSON under bench/out/
+
+`make check` is the commit gate and takes a few minutes; it needs the corpus and proof checker
+from the one-time harness steps above, while `make build` needs only the pinned compiler.
 
 `src/rocsat <command> ...`: `solve <cnf> [proof.drat]` (CDCL; writes a text DRAT proof when a
 path is given), `incremental <transcript>`, `parse <cnf>`, `brute <cnf>` (enumeration reference,
