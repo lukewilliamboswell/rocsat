@@ -26,7 +26,8 @@ if [ -x "$destination/roc" ]; then
 fi
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/rocsat-roc.XXXXXX")
-trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+staging="$destination.partial"
+trap 'rm -rf "$tmp" "$staging"' EXIT HUP INT TERM
 url="https://github.com/roc-lang/nightlies/releases/download/$tag/$asset"
 curl --fail --location --retry 3 --output "$tmp/$asset" "$url"
 actual=$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$tmp/$asset" | awk '{print $1}'; else shasum -a 256 "$tmp/$asset" | awk '{print $1}'; fi)
@@ -41,8 +42,14 @@ if [ -z "$compiler" ]; then
     echo "rocsat: $asset did not contain a roc executable" >&2
     exit 1
 fi
-mkdir -p "$destination"
-cp "$compiler" "$destination/roc.tmp"
-chmod +x "$destination/roc.tmp"
-mv "$destination/roc.tmp" "$destination/roc"
+
+# The macOS archive ships darwin/usr/lib/libSystem.tbd beside the executable and the bundled
+# linker resolves -lSystem there, so the compiler's whole directory is installed. Staging it
+# under one rename keeps a partial install from satisfying the check above on the next run.
+chmod +x "$compiler"
+rm -rf "$staging"
+mkdir -p "$(dirname "$destination")"
+cp -R "$(dirname "$compiler")" "$staging"
+rm -rf "$destination"
+mv "$staging" "$destination"
 printf 'installed %s at %s\n' "$tag" "$destination/roc"

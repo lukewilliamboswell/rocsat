@@ -15,7 +15,7 @@ test:
 	$(ROC) test src/main.roc
 
 bench-test:
-	uv run python -m unittest bench/test_bench.py
+	uv run --script bench/test_bench.py
 
 api-check:
 	scripts/check-api-consumer

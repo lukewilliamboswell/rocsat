@@ -24,7 +24,9 @@ The compiler is pinned in `roc-version`; `scripts/roc` runs that exact nightly f
 `~/.roc/<tag>/roc` (or `$ROC_BIN`) and never a `roc` found on `PATH`. On Linux or macOS,
 `scripts/install-roc` downloads the matching release asset, verifies its committed SHA-256, and
 installs it there. The same archives are available manually from
-`https://github.com/roc-lang/nightlies/releases/tag/<tag>`.
+`https://github.com/roc-lang/nightlies/releases/tag/<tag>`; extract the whole top-level
+directory, because on macOS the bundled linker reads `darwin/usr/lib/libSystem.tbd` from
+beside the executable.
 
 For the test harness, install `git`, `make`, `gcc`, `curl`, `tar`, and
 [`uv`](https://docs.astral.sh/uv/getting-started/installation/). On macOS, the Xcode command-line

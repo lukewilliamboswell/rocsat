@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+# ///
 """Focused tests for dependency-free benchmark plumbing."""
 
 import hashlib
@@ -138,6 +142,8 @@ class RunnerTests(unittest.TestCase):
             self.assertIsNone(rc)
             self.assertFalse(marker.exists())
 
+    @unittest.skipUnless(sys.platform.startswith("linux"),
+                         "peak RSS is sampled from Linux procfs")
     def test_measured_rss_includes_adapter_child(self):
         Path(common.OUT).mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=common.OUT) as tmp:
