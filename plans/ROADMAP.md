@@ -52,10 +52,11 @@ on the nightly suite; revisit those shapes only after the design constraints rec
       and `cnfuzz`, checking PySAT status, SAT models, DRAT proofs, and dev-build propagation expects
 - [ ] Repeated min-of-N whole-suite baselines and optional larger competition instances when a
       compact representative misses a load shape
-- [x] Upstream reports: eight verified reproducers in `upstream/`; issues 01, 02, and 05 were
-      filed as roc#10848, roc#10847, and roc#10849, and the remaining findings were raised in Roc
-      forum discussions/comments. Reporting is closed for this project. Nominal method dispatch
-      cost was re-measured and withdrawn; the monotonic clock is a basic-cli request.
+- [x] Upstream reports: eight verified reproducers in `upstream/`; issues 01, 02, 05, and 07
+      were filed as roc#10848, roc#10847, roc#10849, and roc#10851, and the remaining findings
+      were raised in Roc forum discussions/comments. Reporting is closed for this project. Nominal
+      method dispatch cost was re-measured and withdrawn; the monotonic clock is a basic-cli
+      request.
 - [ ] Simplification passes when `plans/simplify-backlog.md` clusters around one area
 
 ## Current handoff (2026-08-22)
@@ -102,7 +103,7 @@ on the nightly suite; revisit those shapes only after the design constraints rec
 - 2026-08-16 — milestone 0 done: parser (349 MB/s), model checker, brute reference, bench harness (run/expected/fuzz/canary), 31 edge CNFs, `make check` in ~34 s.
 - 2026-08-16 — milestone 1 done: `rocsat solve` (CDCL, 1-UIP, DRAT). uf100/uuf100 ≤ 0.14 s, hole10 71 ms; all UNSAT proofs verified; uf250/uuf250 do not finish in 7 min with the static decision order (milestone 2 re-measures). Compiler finding: only list-parameter/tuple-return functions and `var`-held lists stay in place on this nightly — record threading copies; shape rules in `src/Core.roc`.
 - 2026-08-16 — `upstream/`: eight compiler/toolchain/docs problems re-verified on the pinned nightly and reduced to self-contained reproducers, plus four earlier notes that did not reproduce and one (nominal dispatch cost) that was withdrawn.
-- 2026-08-18 — updated to `nightly-2026-08-18-e9be50a` after same-host validation; minimized issues 01, 02, 05, 06, and 07; filed 01, 02, and 05 as roc#10848, roc#10847, and roc#10849.
+- 2026-08-18 — updated to `nightly-2026-08-18-e9be50a` after same-host validation; minimized issues 01, 02, 05, 06, and 07; filed 01, 02, 05, and 07 as roc#10848, roc#10847, roc#10849, and roc#10851.
 - 2026-08-19 — milestone 2 complete: deterministic EVSIDS, phase saving, and tuned Luby restarts;
   final serial 1-second counts are 57 uf250, 8 uuf250, and 100 flat200, versus MiniSat 82/13/100.
 - 2026-08-19 — milestone 3 complete: recursive minimization removes 27.7% of derived literals on

@@ -3,9 +3,13 @@
 **Originally verified:** `nightly-2026-08-13-2fdd90e`, arm64 macOS (Darwin 24.6.0), Xcode
 command-line tools installed (`roc build --opt=speed` links fine on the same machine).
 
-**Latest-nightly status:** requires a fresh macOS run before filing. On Linux ARM64,
-`nightly-2026-08-18-e9be50a` passes the speed-backend test, so that platform cannot confirm or
-falsify the macOS linker failure.
+**Latest-nightly status:** does not reproduce. On 2026-08-24, arm64 macOS (Darwin 24.6.0) with
+`nightly-2026-08-18-e9be50a` and the complete compiler archive installed, `roc test --opt=speed
+--no-cache expect_only.roc` printed `All (1) tests passed in 278.8 ms.` and exited 0; Linux ARM64
+passes it too. Kept as evidence, not as a live problem. One caveat for anyone chasing the same
+message: an installation holding only the `roc` executable, without the `darwin/usr/lib` directory
+shipped beside it, produces an identical `-lSystem` error — but the original run recorded
+`roc build --opt=speed` working on the same machine, which that explanation does not fit.
 
 ## Problem
 

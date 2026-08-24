@@ -4,8 +4,9 @@
 
 **Latest nightly:** the backend is still broken on `nightly-2026-08-18-e9be50a`, Linux ARM64,
 but with a different symptom: the build reports success and the resulting binary immediately
-segfaults. The old nightly has the same Linux behavior. A fresh macOS run is needed before
-filing the original linker symptom.
+segfaults. The old nightly has the same Linux behavior. Re-run on 2026-08-24 on arm64 macOS with
+that nightly, the original symptom stands: `roc build --opt=interpreter --no-cache hello.roc`
+fails with `ld64.lld: error: undefined symbol: _main` and produces no binary.
 
 ## Problem
 

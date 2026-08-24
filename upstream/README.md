@@ -12,7 +12,7 @@ draft, plus the Roc files, plus (where the symptom is timing or flakiness) a way
 Every timing MRE prints a checksum so the modes can be compared for equality, and takes its
 sizes from `argv` so nothing is constant-folded at compile time.
 
-Filed upstream: [01 as roc#10848](https://github.com/roc-lang/roc/issues/10848), [02 as roc#10847](https://github.com/roc-lang/roc/issues/10847), and [05 as roc#10849](https://github.com/roc-lang/roc/issues/10849). The remaining findings were raised in Roc forum discussions/comments. Reporting is closed for this project; these directories remain as evidence, not a filing queue.
+Filed upstream: [01 as roc#10848](https://github.com/roc-lang/roc/issues/10848), [02 as roc#10847](https://github.com/roc-lang/roc/issues/10847), [05 as roc#10849](https://github.com/roc-lang/roc/issues/10849), and [07 as roc#10851](https://github.com/roc-lang/roc/issues/10851). The remaining findings were raised in Roc forum discussions/comments. Reporting is closed for this project; these directories remain as evidence, not a filing queue.
 
 ## Latest-nightly retest
 
@@ -26,16 +26,15 @@ remain:
 |---|---|
 | [01](01-record-field-clone/) | Reproduced and reduced to one list, one scalar, and one loop. With a 1 M-element list, 100/200/400 writes through a call-built record took 296/597/1,185 ms; the equivalent literal-built record stayed near 1.3 ms. |
 | [02](02-nominal-pattern-segfault/) | Reproduced with both omitted and nonexistent nominal fields. The minimal app crashed in 20/20 uncached checks on both tested nightlies; its corrected pattern checks cleanly. |
-| [03](03-roc-test-speed-link/) | macOS linker symptom not testable on Linux. Speed-backend tests pass on both nightlies when `TMPDIR` is executable; this host's default no-exec `/tmp` otherwise causes an unrelated `PermissionDenied`. |
-| [04](04-opt-interpreter-link/) | macOS linker symptom not testable on Linux, but the backend is still broken here too: both nightlies report a successful interpreter build and the resulting hello-world immediately segfaults. |
+| [03](03-roc-test-speed-link/) | Does not reproduce. Re-run on 2026-08-24 on arm64 macOS with the pinned nightly and the complete compiler archive installed: `roc test --opt=speed --no-cache expect_only.roc` passed in 278.8 ms, exit 0. Speed-backend tests also pass on Linux when `TMPDIR` is executable; this host's default no-exec `/tmp` otherwise causes an unrelated `PermissionDenied`. |
+| [04](04-opt-interpreter-link/) | Reproduced. On arm64 macOS (2026-08-24, pinned nightly) `roc build --opt=interpreter` still fails with `undefined symbol: _main` and produces no binary; on Linux both nightlies report a successful build whose hello-world immediately segfaults. |
 | [05](05-nested-list-clone/) | Reproduced and reduced to one fixed-size inner list. With 1 M elements, 100/200/400 writes through `List.update` took 286/570/1,148 ms; the equivalent singleton-list rebuild took 1.5/1.8/2.1 ms. |
 | [06](06-list-reserve-quadratic/) | Reproduced and reduced to one 225-byte loop. At 10k/20k/40k/80k elements, reserving two slots before two appends took 152/588/2,322/9,307 ms; removing only the `reserve` line took 0.35/0.48/0.79/1.30 ms. |
 | [07](07-helper-not-inlined/) | Reproduced and reduced to one two-item list and a two-line helper body. At 20 M/40 M/80 M iterations, the helper took 75/151/301 ms; writing the same two changes directly in the loop took 10/20/40 ms. |
 | [08](08-docs-expect-opt-speed/) | Reproduced, and the contradictory note is still present at compiler commit `e9be50a` and on `main`: speed/size omit the condition while a small dev run remains quadratic. |
 
-Checksums matched across every mode in the timing reproducers. Issues 03 and 04 need a fresh
-macOS run before filing their original platform-specific symptoms; the other six reproduce on
-the latest nightly.
+Checksums matched across every mode in the timing reproducers. Issue 03 no longer reproduces on
+macOS; the other seven, including 04's macOS-only linker failure, still do.
 
 ## Summary
 
