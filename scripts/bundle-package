@@ -1,0 +1,11 @@
+#!/bin/sh
+# Stage the package beside its license. Roc follows the imports from main.roc.
+set -eu
+root=$(cd "$(dirname "$0")/.." && pwd)
+out=${1:-"$root/.roc-cache/bundles"}
+mkdir -p "$out" "$root/.roc-cache"
+tmp=$(mktemp -d "$root/.roc-cache/bundle-package.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+
+cp "$root"/src/*.roc "$root/LICENSE" "$tmp/"
+"$root/scripts/roc" bundle --output-dir "$out" "$tmp/main.roc" "$tmp/LICENSE"

@@ -130,7 +130,7 @@ Reduce :: [].{
         and (reason.get(implied.shr_wrap(1).to_u64()) ?? Core.none) == cref
     }
 
-    worse_first : List(U32), U32, U32 -> [LT, EQ, GT]
+    worse_first : List(U32), U32, U32 -> [Before, Same, After]
     worse_first = |arena, a, b| {
         au = a.to_u64()
         bu = b.to_u64()
@@ -138,7 +138,7 @@ Reduce :: [].{
         bg = Core.clause_glue(arena.get(bu + 1) ?? 0)
         asize = Core.clause_size(arena.get(au) ?? 0)
         bsize = Core.clause_size(arena.get(bu) ?? 0)
-        if ag != bg { bg.compare(ag) } else if asize != bsize { bsize.compare(asize) } else { a.compare(b) }
+        if ag != bg { bg.order_relative_to(ag) } else if asize != bsize { bsize.order_relative_to(asize) } else { a.order_relative_to(b) }
     }
 }
 

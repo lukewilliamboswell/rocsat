@@ -2,17 +2,22 @@ ROC := scripts/roc
 SOLVER := solve
 # Instance-size cap for the fuzz generators (the brute reference is capped at 24 variables).
 MAX_VARS := 24
+FUZZ_BIN := .roc-cache/rocsat-fuzz
+FUZZ_SECONDS ?= 30
 
-.PHONY: build build-dev test bench-test api-check source-check check regression incremental fuzz canary perf-smoke perf-diverse
+.PHONY: build build-dev bundle test bench-test api-check source-check check regression incremental fuzz fuzz-build fuzz-check fuzz-run canary perf-smoke perf-diverse
 
 build:
-	$(ROC) build --opt=speed --output=src/rocsat src/main.roc
+	$(ROC) build --opt=speed --output=src/rocsat src/cli.roc
 
 build-dev:
-	$(ROC) build --opt=dev --output=src/rocsat-dev src/main.roc
+	$(ROC) build --opt=dev --output=src/rocsat-dev src/cli.roc
+
+bundle:
+	scripts/bundle-package
 
 test:
-	$(ROC) test src/main.roc
+	$(ROC) test src/cli.roc
 
 bench-test:
 	uv run --script bench/test_bench.py
@@ -31,6 +36,18 @@ incremental: build
 
 fuzz: build build-dev
 	uv run --script bench/fuzz.py --subcommand $(SOLVER) --max-vars $(MAX_VARS) --seconds 30 --tiny --drat
+
+fuzz-build:
+	mkdir -p $(dir $(FUZZ_BIN))
+	$(ROC) build --fuzz --output=$(FUZZ_BIN) src/fuzz.roc
+
+fuzz-check: fuzz-build
+	@set -eu; targets=$$($(FUZZ_BIN) --list-targets); test -n "$$targets"; \
+	for name in $$targets; do $(FUZZ_BIN) --target="$$name" check; done
+
+fuzz-run: fuzz-build
+	@set -eu; targets=$$($(FUZZ_BIN) --list-targets); test -n "$$targets"; \
+	for name in $$targets; do $(FUZZ_BIN) --target="$$name" run --time=$(FUZZ_SECONDS); done
 
 canary: build
 	bench/canary.sh

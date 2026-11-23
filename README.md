@@ -15,18 +15,18 @@ research, not missing release functionality.
 
 Rocsat is an experimental solver and a substantial exercise of Roc's new compiler, not a claim to
 replace mature native competition solvers. Search is deterministic, but performance and the source
-API may change before 1.0. Builds use the exact compiler nightly in `roc-version` because newer
-nightlies must be revalidated against known ownership/code-generation sensitivities.
+API may change before 1.0. Builds use the exact compiler release in `roc-version` so that compiler
+changes in ownership and code generation can be tested before upgrading.
 
 ## Toolchain
 
-The compiler is pinned in `roc-version`; `scripts/roc` runs that exact nightly from
-`~/.roc/<tag>/roc` (or `$ROC_BIN`) and never a `roc` found on `PATH`. On Linux or macOS,
-`scripts/install-roc` downloads the matching release asset, verifies its committed SHA-256, and
-installs it there. The same archives are available manually from
-`https://github.com/roc-lang/nightlies/releases/tag/<tag>`; extract the whole top-level
-directory, because on macOS the bundled linker reads `darwin/usr/lib/libSystem.tbd` from
-beside the executable.
+The compiler is pinned to Roc `0.1.0_RC1` in `roc-version`. On Linux or macOS,
+`scripts/install-roc` downloads the matching release asset, verifies its SHA-256, and
+installs it under `~/.roc/0.1.0_RC1/`. Set `ROC_BIN` to use an existing installation.
+On Apple Silicon, for example, run `ROC_BIN=~/roc-macos_apple_silicon-0.1.0_RC1/roc make source-check`.
+If installing manually, extract the whole release archive so the bundled macOS linker can find
+`darwin/usr/lib/libSystem.tbd` beside the executable.
+[Roc 0.1.0_RC1 release](https://github.com/roc-lang/roc/releases/tag/0.1.0_RC1)
 
 For the test harness, install `git`, `make`, `gcc`, `curl`, `tar`, and
 [`uv`](https://docs.astral.sh/uv/getting-started/installation/). On macOS, the Xcode command-line
@@ -67,7 +67,9 @@ src/rocsat solve /tmp/unsat.cnf /tmp/unsat.drat
     make test          # roc test over src/
     make api-check     # build and run examples/api-consumer.roc as a separate application
     make source-check  # CI gate: source tests, harness tests, API consumer, build, version
-    make check         # source/API tests + regression + incremental differential + 30 s fuzz
+    make check         # source/API tests, DRAT and incremental regression, 30 s CLI fuzz
+    make fuzz-check    # run the declared roc-fuzz examples and allocation budgets
+    make fuzz-run      # explore each roc-fuzz target for FUZZ_SECONDS (default 30)
     make canary        # timing canary: ns/clause on a 2 M contradictory implication chain
     make perf-smoke    # 40 serial representatives, 2 s cap, JSON under bench/out/
     make perf-diverse  # 112 serial representatives, 10 s cap, JSON under bench/out/
@@ -80,13 +82,39 @@ path is given), `incremental <transcript>`, `parse <cnf>`, `brute <cnf>` (enumer
 ≤ 24 vars), `check <cnf> <model>`, `version`, `help`. One-shot solving prints `c` statistics, then
 SAT-competition `s`/`v` lines, and exits 10 (SAT) / 20 (UNSAT).
 
+## Fuzz suites
+
+`src/fuzz.roc` groups the solver and DIMACS suites with roc-fuzz 0.7.0. The solver suite checks
+batch and incremental results against brute force, including models and failed-assumption cores,
+and checks allocation growth for repeated `new_var` calls. The DIMACS suite covers round trips,
+arbitrary body bytes, and the parser's allocation budget for overstated clause counts.
+[roc-fuzz 0.7.0 release](https://github.com/lukewilliamboswell/roc-fuzz/releases/tag/0.7.0)
+
+```sh
+make fuzz-build
+.roc-cache/rocsat-fuzz --list-targets
+.roc-cache/rocsat-fuzz --target=incremental-vs-brute run --runs=200000 --time=60
+```
+
+The suites run on Apple Silicon macOS and Linux x86-64. The runner keeps corpora and reports
+under `.roc-fuzz/` by default. Use the same target name with `show` and `replay` to inspect or
+rerun a saved input. The existing `make fuzz` also checks against PySAT and verifies DRAT proofs.
+
 ## Incremental API
 
-`src/Rocsat.roc` accepts nonzero signed `I32` DIMACS literals and owns conversion to the engine's
-internal encoding. Variables can be introduced with `new_var` or simply by mentioning them in a
-clause or assumption. The main operations are:
+Add this dependency to your app header and import `sat.Rocsat`. The package uses Roc
+`0.1.0_RC1` and works with the app's choice of platform.
 
 ```roc
+sat: "https://github.com/lukewilliamboswell/rocsat/releases/download/0.0.1/BMxghpQfH1SCuFgQS2vUDCUhqkMLNniXerXCe4h5nH83.tar.zst",
+```
+
+`Rocsat` accepts nonzero signed `I32` DIMACS literals. Variables can be introduced with
+`new_var` or by mentioning them in a clause or assumption.
+
+```roc
+import sat.Rocsat
+
 state0 = Rocsat.new({})
 state1 = Rocsat.add_clause(state0, [1, -2])?
 state2 = Rocsat.add_clause(state1, [2, 3])?
@@ -121,8 +149,9 @@ not called standard INCCNF. Text DRAT output remains a one-shot/global-UNSAT fac
   exposed as failed-assumption clauses, not proof streams.
 - The engine deliberately has no variable-elimination preprocessor. Such elimination would need
   model reconstruction and revival semantics for later incremental clauses.
-- The checked-in `Rocsat` module is the reusable source boundary. A separately compiled consumer
-  test guards that boundary; no stable package registry release or C ABI is promised for 0.1.0.
+- The package exposes the `Rocsat` module as its Roc API. `make api-check` builds and runs a
+  separate consumer against the package. `make bundle` writes the distributable archive to
+  `.roc-cache/bundles/`.
 
 Solver structure (`src/`): `Rocsat` (public incremental facade), `Core` (state record, arena,
 watch pool, trail primitives), `Propagate` (2WL unit propagation), `Analyze` (1-UIP and recursive minimization), `Branch` (deterministic
@@ -130,7 +159,7 @@ EVSIDS and phase saving), `Reduce` (LBD tiers, learned-clause deletion, arena GC
 (level-0 clause cleanup), `Drat` (proof lines), and `Solver` (clause input and search loop). Search
 uses Luby restarts; proof-safe watch rebuilds and compacting collection keep the learned database
 bounded. Hot code takes and returns lists, never the state record — the header of `src/Core.roc`
-explains why and what shapes this Roc nightly keeps in place.
+explains the ownership constraints those shapes address.
 
 ## Benchmark corpus
 

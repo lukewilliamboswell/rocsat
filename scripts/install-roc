@@ -3,7 +3,6 @@
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 tag=$(tr -d '[:space:]' < "$root/roc-version")
-version=${tag#nightly-}
 
 case "$(uname -s):$(uname -m)" in
     Linux:x86_64) platform=linux_x86_64 ;;
@@ -13,7 +12,7 @@ case "$(uname -s):$(uname -m)" in
     *) echo "rocsat: no pinned Roc archive for $(uname -s) $(uname -m)" >&2; exit 1 ;;
 esac
 
-asset="roc_nightly-${platform}-${version}.tar.gz"
+asset="roc-${platform}-${tag}.tar.gz"
 checksum=$(awk -v asset="$asset" '$2 == asset { print $1 }' "$root/scripts/roc-checksums")
 if [ -z "$checksum" ]; then
     echo "rocsat: scripts/roc-checksums has no entry for $asset" >&2
@@ -25,10 +24,11 @@ if [ -x "$destination/roc" ]; then
     exit 0
 fi
 
-tmp=$(mktemp -d "${TMPDIR:-/tmp}/rocsat-roc.XXXXXX")
-staging="$destination.partial"
-trap 'rm -rf "$tmp" "$staging"' EXIT HUP INT TERM
-url="https://github.com/roc-lang/nightlies/releases/download/$tag/$asset"
+parent=$(dirname "$destination")
+mkdir -p "$parent"
+tmp=$(mktemp -d "$parent/.rocsat-roc.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+url="https://github.com/roc-lang/roc/releases/download/$tag/$asset"
 curl --fail --location --retry 3 --output "$tmp/$asset" "$url"
 actual=$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "$tmp/$asset" | awk '{print $1}'; else shasum -a 256 "$tmp/$asset" | awk '{print $1}'; fi)
 if [ "$actual" != "$checksum" ]; then
@@ -36,20 +36,18 @@ if [ "$actual" != "$checksum" ]; then
     exit 1
 fi
 
-tar -xzf "$tmp/$asset" -C "$tmp"
-compiler=$(find "$tmp" -type f -name roc | head -1)
+mkdir "$tmp/extracted"
+tar -xzf "$tmp/$asset" -C "$tmp/extracted"
+compiler=$(find "$tmp/extracted" -type f -name roc | head -1)
 if [ -z "$compiler" ]; then
     echo "rocsat: $asset did not contain a roc executable" >&2
     exit 1
 fi
 
 # The macOS archive ships darwin/usr/lib/libSystem.tbd beside the executable and the bundled
-# linker resolves -lSystem there, so the compiler's whole directory is installed. Staging it
-# under one rename keeps a partial install from satisfying the check above on the next run.
+# linker resolves -lSystem there. Renaming the whole extracted directory
+# keeps a partial install from satisfying the check above on the next run.
 chmod +x "$compiler"
-rm -rf "$staging"
-mkdir -p "$(dirname "$destination")"
-cp -R "$(dirname "$compiler")" "$staging"
 rm -rf "$destination"
-mv "$staging" "$destination"
+mv "$(dirname "$compiler")" "$destination"
 printf 'installed %s at %s\n' "$tag" "$destination/roc"

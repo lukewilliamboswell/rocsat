@@ -23,3 +23,5 @@ jobs:
         run: scripts/install-roc
       - name: Check source, harness, and public API consumer
         run: make source-check
+      - name: Check roc-fuzz suite examples
+        run: make fuzz-check

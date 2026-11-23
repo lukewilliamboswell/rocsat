@@ -134,5 +134,5 @@ cd upstream/<dir>
 cat README.md   # exact commands and the numbers we measured
 ```
 
-The repository pins the compiler in `roc-version` and runs it through `scripts/roc`, which
-never falls back to a `roc` on `PATH`.
+These reproductions use the historical compilers listed in each issue. Use their binaries
+directly, or set `ROC_BIN` when invoking `scripts/roc`.

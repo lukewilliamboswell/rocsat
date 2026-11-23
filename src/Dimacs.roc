@@ -40,7 +40,10 @@ Dimacs :: [].{
         header = read_header(bytes, $i)?
         $i = header.next
         var $num_vars = header.num_vars
-        var $clauses = List.with_capacity(header.num_clauses)
+        # Even an empty clause needs a zero token and a separator. The header is
+        # only a sizing hint, so an overstated count must not drive allocation.
+        possible_clauses = (n - header.next + 1) // 2
+        var $clauses = List.with_capacity(header.num_clauses.min(possible_clauses))
         var $lits = []
         var $done = Bool.False
         while !$done {

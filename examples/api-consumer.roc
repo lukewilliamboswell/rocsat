@@ -1,8 +1,11 @@
 # A separately compiled application that uses only rocsat's public signed-literal facade.
 
-app [main!] { pf: platform "https://github.com/roc-lang/basic-cli/releases/download/0.22.0/F1JVZPYfWP71s8vk6tHcV1Qx1Ef6CZkwswGoCn8VHZmL.tar.zst" }
+app [main!] {
+    pf: platform "https://github.com/roc-lang/basic-cli/releases/download/0.28.1/7brgwR8YUqfeGrkdfF1V4GPPN7DnP7ftqub9KcrTEZtr.tar.zst",
+    sat: "../src/main.roc",
+}
 
-import Rocsat
+import sat.Rocsat
 
 main! = |args| {
     signed_one = if args.len() == 999999 { -1 } else { 1 }

@@ -5,6 +5,7 @@ plans/
 src/rocsat
 src/rocsat-dev
 .roc-cache/
+.roc-fuzz/
 
 # binaries built by the upstream reproducers (each dir keeps only its .roc/.md/run.sh)
 upstream/01-record-field-clone/app

@@ -130,10 +130,10 @@ Rocsat :: [].{
         } else {
             extra = requested - old
             lits_extra = 2 * extra
-            activity = st.activity.concat(List.repeat(0, extra))
-            heap0 = st.heap.concat(List.repeat(0, extra))
-            hpos0 = st.hpos.concat(List.repeat(Branch.absent, extra))
-            phase0 = st.phase.concat(List.repeat(1, extra))
+            activity = extend(st.activity, 0, extra)
+            heap0 = extend(st.heap, 0, extra)
+            hpos0 = extend(st.hpos, Branch.absent, extra)
+            phase0 = extend(st.phase, 1, extra)
             var $new_trail = List.with_capacity(extra)
             var $v = old
             while $v < requested {
@@ -141,18 +141,18 @@ Rocsat :: [].{
                 $v = $v + 1
             }
             (heap, hpos, phase, heap_len) = Branch.backtrack(activity, heap0, hpos0, st.search.heap_len, phase0, $new_trail, 0, extra)
-            trail_lim = if st.trail_lim.len() < requested { st.trail_lim.concat(List.repeat(0, requested - st.trail_lim.len())) } else { st.trail_lim }
+            trail_lim = if st.trail_lim.len() < requested { extend(st.trail_lim, 0, requested - st.trail_lim.len()) } else { st.trail_lim }
             {
                 ..st,
-                wofs: st.wofs.concat(List.repeat(0, lits_extra)),
-                wlen: st.wlen.concat(List.repeat(0, lits_extra)),
-                wcap: st.wcap.concat(List.repeat(0, lits_extra)),
-                value: st.value.concat(List.repeat(Model.unassigned, lits_extra)),
-                level: st.level.concat(List.repeat(0, extra)),
-                reason: st.reason.concat(List.repeat(Core.none, extra)),
-                trail: st.trail.concat(List.repeat(0, extra)),
+                wofs: extend(st.wofs, 0, lits_extra),
+                wlen: extend(st.wlen, 0, lits_extra),
+                wcap: extend(st.wcap, 0, lits_extra),
+                value: extend(st.value, Model.unassigned, lits_extra),
+                level: extend(st.level, 0, extra),
+                reason: extend(st.reason, Core.none, extra),
+                trail: extend(st.trail, 0, extra),
                 trail_lim,
-                seen: st.seen.concat(List.repeat(0, extra)),
+                seen: extend(st.seen, 0, extra),
                 activity,
                 heap,
                 hpos,
@@ -160,6 +160,15 @@ Rocsat :: [].{
                 search: { ..st.search, heap_len },
             }
         }
+    }
+
+    # Single-variable growth can reuse append's spare capacity without a
+    # temporary fill list. Larger jumps use the bulk fill.
+    extend : List(a), a, U64 -> List(a)
+    extend = |list, item, count| match count {
+        1 => list.append(item)
+        2 => list.append(item).append(item)
+        _ => list.concat(List.repeat(item, count))
     }
 }
 

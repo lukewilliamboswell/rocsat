@@ -49,10 +49,10 @@ Solver :: [].{
     add_clauses : Core.State, List(List(U32)) -> Core.State
     add_clauses = |input, clauses| {
         st0 = to_root(input)
-        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, search, stats, proof } = st0
+        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, search, stats: counters, proof } = st0
         expect search.dl == 0
         (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, bytes1, sc) =
-            add_all(arena, pool, wofs, wlen, wcap, value, level, reason, trail, proof.bytes, { trail_len: search.trail_len, qhead: search.qhead, ok: search.ok, propagations: stats.propagations, proof_on: proof.on, traced: proof.traced }, clauses)
+            add_all(arena, pool, wofs, wlen, wcap, value, level, reason, trail, proof.bytes, { trail_len: search.trail_len, qhead: search.qhead, ok: search.ok, propagations: counters.propagations, proof_on: proof.on, traced: proof.traced }, clauses)
         {
             arena: arena1,
             pool: pool1,
@@ -70,7 +70,7 @@ Solver :: [].{
             hpos,
             phase,
             search: { ..search, trail_len: sc.trail_len, qhead: sc.qhead, ok: sc.ok },
-            stats: { ..stats, propagations: sc.propagations },
+            stats: { ..counters, propagations: sc.propagations },
             proof: { ..proof, bytes: bytes1, traced: sc.traced },
         }
     }
@@ -166,7 +166,7 @@ Solver :: [].{
     # `Skip` when it is tautological or already satisfied.
     simplify : List(U8), List(U32) -> [Skip, Keep(List(U32))]
     simplify = |value, lits| {
-        sorted = lits.sort_with(|a, b| a.compare(b))
+        sorted = lits.sort()
         var $kept = []
         var $prev = Core.undef_lit
         for q in sorted {
@@ -197,11 +197,11 @@ Solver :: [].{
     solve : Core.State, List(U32) -> (Core.State, [Sat, Unsat], List(U32))
     solve = |input, assumptions| {
         rooted = to_root(input)
-        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim: old_trail_lim, seen, activity, heap, hpos, phase, search, stats, proof } = rooted
+        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim: old_trail_lim, seen, activity, heap, hpos, phase, search, stats: counters, proof } = rooted
         needed_levels = level.len() + assumptions.len()
         trail_lim = if old_trail_lim.len() < needed_levels { old_trail_lim.concat(List.repeat(0, needed_levels - old_trail_lim.len())) } else { old_trail_lim }
         (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, trail_lim1, seen1, activity1, heap1, hpos1, phase1, bytes1, sc, status, final) =
-            search_loop(arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, proof.bytes, { trail_len: search.trail_len, dl: search.dl, qhead: search.qhead, heap_len: search.heap_len, var_inc: search.var_inc, simplified: search.simplified, ok: search.ok, conflicts: stats.conflicts, decisions: stats.decisions, propagations: stats.propagations, restarts: stats.restarts, reductions: stats.reductions, collections: stats.collections, simplifications: stats.simplifications, simplified_clauses: stats.simplified_clauses, simplified_literals: stats.simplified_literals, deleted_clauses: stats.deleted_clauses, learnt_literals_before: stats.learnt_literals_before, learnt_literals_after: stats.learnt_literals_after, proof_on: proof.on, traced: proof.traced }, assumptions)
+            search_loop(arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, proof.bytes, { trail_len: search.trail_len, dl: search.dl, qhead: search.qhead, heap_len: search.heap_len, var_inc: search.var_inc, simplified: search.simplified, ok: search.ok, conflicts: counters.conflicts, decisions: counters.decisions, propagations: counters.propagations, restarts: counters.restarts, reductions: counters.reductions, collections: counters.collections, simplifications: counters.simplifications, simplified_clauses: counters.simplified_clauses, simplified_literals: counters.simplified_literals, deleted_clauses: counters.deleted_clauses, learnt_literals_before: counters.learnt_literals_before, learnt_literals_after: counters.learnt_literals_after, proof_on: proof.on, traced: proof.traced }, assumptions)
         st = {
             arena: arena1,
             pool: pool1,
