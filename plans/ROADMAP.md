@@ -144,6 +144,15 @@ on the nightly suite; revisit those shapes only after the design constraints rec
   lexicographic model guarantee), `add_clauses`, `counters`, and `new_with_proof`. Unlimited search
   is unchanged decision for decision on 156 corpus instances; three new roc-fuzz properties check
   the additions against brute force.
+- 2026-11-24 — reshaped those additions before release, on feedback from the first client:
+  `solve_with` replaces `solve_limited`, `set_preferred` and `counters`. Assumptions, preferred
+  literals and the conflict budget are fields of one per-call record, the budget is exact, and the
+  call returns what it spent. `add_clauses_flat` loads zero-terminated clauses from one list.
+  Unlimited search is unchanged decision for decision on the regression set.
+- 2026-11-24 — loading under the dev backend and compile-time evaluation was quadratic for three
+  reasons: an inline watch check per added clause, the `List(a)` write helper, and writes into the
+  nested clause list. `add_all` drops the check, `put` is typed per element, and the API loads a
+  flat list. 8,000 clauses as a compile-time constant: 4.7 s to 20 ms.
 - 2026-11-23 — heap order after an activity rescale: scaling by 1e-100 made distinct small scores
   equal (zero after about four rescales) without reordering the heap, so the lower-ID tie rule and
   the inline `Branch.consistent` check failed on long solves over a few thousand variables

@@ -31,7 +31,7 @@ Analyze :: [].{
                 v = q.shr_wrap(1).to_u64()
                 lv = level.get(v) ?? 0
                 if ($seen.get(v) ?? 1) == 0 and lv > 0 {
-                    $seen = Core.put($seen, v, 1)
+                    $seen = Core.put_u8($seen, v, 1)
                     $to_clear = $to_clear.append(v.to_u32_wrap())
                     if lv == dl {
                         $path = $path + 1
@@ -46,7 +46,7 @@ Analyze :: [].{
             }
             $p = trail.get($idx) ?? 0
             pv = $p.shr_wrap(1).to_u64()
-            $seen = Core.put($seen, pv, 0)
+            $seen = Core.put_u8($seen, pv, 0)
             $c = reason.get(pv) ?? Core.none
             $path = $path - 1
             $first = Bool.False
@@ -85,7 +85,7 @@ Analyze :: [].{
         var $out = [p]
         pv = p.shr_wrap(1).to_u64()
         if (level.get(pv) ?? 0) > 0 {
-            $seen = Core.put($seen, pv, 1)
+            $seen = Core.put_u8($seen, pv, 1)
             root = (trail_lim.get(0) ?? 0).to_u64()
             var $i = trail_len
             while $i > root {
@@ -104,16 +104,16 @@ Analyze :: [].{
                             r = arena.get($k) ?? 0
                             rv = r.shr_wrap(1).to_u64()
                             if (level.get(rv) ?? 0) > 0 {
-                                $seen = Core.put($seen, rv, 1)
+                                $seen = Core.put_u8($seen, rv, 1)
                             }
                             $k = $k + 1
                         }
                     }
-                    $seen = Core.put($seen, v, 0)
+                    $seen = Core.put_u8($seen, v, 0)
                 }
             }
         }
-        $seen = Core.put($seen, pv, 0)
+        $seen = Core.put_u8($seen, pv, 0)
         expect $seen.all(|s| s == 0)
         ($seen, $out)
     }
@@ -157,22 +157,22 @@ Analyze :: [].{
             marker = decision.shr_wrap(1).to_u64()
             state = $seen.get(marker) ?? 0
             if state < 2 {
-                $seen = Core.put($seen, marker, state + 2)
+                $seen = Core.put_u8($seen, marker, state + 2)
                 $glue = $glue + 1
             }
             $i = $i + 1
         }
         for v in source_clear {
-            $seen = Core.put($seen, v.to_u64(), 0)
+            $seen = Core.put_u8($seen, v.to_u64(), 0)
         }
         for v in $min_clear {
-            $seen = Core.put($seen, v.to_u64(), 0)
+            $seen = Core.put_u8($seen, v.to_u64(), 0)
         }
         $i = 0
         while $i < $kept.len() {
             lv = level_of(level, $kept, $i).to_u64()
             decision = trail.get((trail_lim.get(lv - 1) ?? 0).to_u64()) ?? 0
-            $seen = Core.put($seen, decision.shr_wrap(1).to_u64(), 0)
+            $seen = Core.put_u8($seen, decision.shr_wrap(1).to_u64(), 0)
             $i = $i + 1
         }
         ($seen, $kept, $glue.min(255))
@@ -203,7 +203,7 @@ Analyze :: [].{
                 if ($seen.get(v) ?? 0) == 0 and lv > 0 {
                     r = reason.get(v) ?? Core.none
                     if r != Core.none and abstract_level(lv).bitwise_and(abstract_levels) != 0 {
-                        $seen = Core.put($seen, v, 1)
+                        $seen = Core.put_u8($seen, v, 1)
                         $min_clear = $min_clear.append(v.to_u32_wrap())
                         $stack = $stack.append(q)
                     } else {
@@ -216,7 +216,7 @@ Analyze :: [].{
         if !$redundant {
             var $j = top
             while $j < $min_clear.len() {
-                $seen = Core.put($seen, ($min_clear.get($j) ?? 0).to_u64(), 0)
+                $seen = Core.put_u8($seen, ($min_clear.get($j) ?? 0).to_u64(), 0)
                 $j = $j + 1
             }
         }

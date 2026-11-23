@@ -33,7 +33,7 @@ Branch :: [].{
         for v32 in touched {
             v = v32.to_u64()
             score = ($activity.get(v) ?? 0) + var_inc
-            $activity = Core.put($activity, v, score)
+            $activity = Core.put_f64($activity, v, score)
             if score > 1.0e100 { $rescale = Bool.True }
             var $i = ($hpos.get(v) ?? absent).to_u64()
             if $i != absent.to_u64() {
@@ -57,7 +57,7 @@ Branch :: [].{
         if $rescale {
             var $v = 0
             while $v < $activity.len() {
-                $activity = Core.put($activity, $v, ($activity.get($v) ?? 0) * 1.0e-100)
+                $activity = Core.put_f64($activity, $v, ($activity.get($v) ?? 0) * 1.0e-100)
                 $v = $v + 1
             }
             # Scaling rounds, and underflows small scores to zero, so scores that differed can now
@@ -182,7 +182,7 @@ Branch :: [].{
             lit = trail.get($k) ?? 0
             v32 = lit.shr_wrap(1)
             v = v32.to_u64()
-            $phase = Core.put($phase, v, lit.bitwise_and(1).to_u8_wrap())
+            $phase = Core.put_u8($phase, v, lit.bitwise_and(1).to_u8_wrap())
             if ($hpos.get(v) ?? absent) == absent {
                 expect $len < $heap.len()
                 $heap = Core.put($heap, $len, v32)

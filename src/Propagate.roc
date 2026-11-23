@@ -87,8 +87,8 @@ Propagate :: [].{
                                 }
                             } else {
                                 fu = first.to_u64()
-                                $value = Core.put($value, fu, Model.true_val)
-                                $value = Core.put($value, fu.bitwise_xor(1), Model.false_val)
+                                $value = Core.put_u8($value, fu, Model.true_val)
+                                $value = Core.put_u8($value, fu.bitwise_xor(1), Model.false_val)
                                 $level = Core.put($level, fu.shr_wrap(1), dl)
                                 $reason = Core.put($reason, fu.shr_wrap(1), c)
                                 $trail = Core.put($trail, $trail_len, first)

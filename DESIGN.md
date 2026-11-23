@@ -15,6 +15,15 @@ and `upstream/` contains the Roc compiler evidence that constrained the represen
   ([upstream issue 01](upstream/01-record-field-clone/)). `Core.put` is the single write shape, and
   owner loops keep lists in `var`s between calls. Reconsider this only after a new compiler passes
   `make canary` and representative benchmarks.
+- Optimized builds are not the only way the engine runs: `roc test` uses the dev backend, and a
+  client's top-level constant is evaluated by the compiler. Neither specializes a helper typed
+  over `List(a)`, which then copies the list on every call, so `put` exists once per element type
+  (`put`, `put_u8`, `put_f64`); neither writes into a list of lists in place, so the public API
+  hands the engine clauses as one flat literal list; and both keep inline `expect`s, so
+  `Solver.add_all` carries no check that walks the formula. Each of the three made loading
+  quadratic there: 8,000 three-literal clauses took 4.7 s as a compile-time constant and take
+  20 ms now, and the dev backend solves `hole7` in 2.7 s instead of 26 s. An optimized build
+  is unaffected by all three.
 - The trail and heap are fixed-capacity indexed buffers with explicit live lengths. The original
   claim that list truncation destroyed uniqueness did not reproduce, but changing these buffers
   would alter the hottest propagation/backtrack storage and therefore remains a separately measured
@@ -44,19 +53,29 @@ and `upstream/` contains the Roc compiler evidence that constrained the represen
 - `Reduce.maybe` is an unconditional ownership boundary. Moving its condition into the owner loop
   retained list aliases on the pinned compiler and slowed `hole8` from 1.95 s to 13.3 s even when
   no reduction occurred.
-- A conflict limit shortens the restart interval instead of adding a test to the conflict path:
-  when the budget is spent, the search performs the restart's cancel-to-root and stops rather than
-  resuming. A stopped state is therefore one a restart also produces, with nothing pending, and
-  an unlimited search is unchanged decision for decision. The cost is MiniSat's semantics: the
-  limit is tested only where the search is about to branch, so directly consecutive conflicts
-  overshoot it.
-- Preferred literals are soft assumptions. `Solver.solve` appends them to the assumptions, and the
-  loop gives every position a decision level as it already did; a position past the real
-  assumptions whose literal is already false gets a dummy level instead of ending the search. One
-  list that the loop only reads supplies both the branching order and a sign that phase saving
-  cannot overwrite, without a new list in the owner loop or any change to `Branch`. Because the
-  listed literals are always decided first, in order and with their own sign, each model is the
-  lexicographically best one for the list. A pinned bit in the phase byte was rejected: it needs a
+- A conflict budget is exact. The owner loop tests it once per iteration, before propagating, so
+  the loop ends right after the conflict that reaches the budget has been analysed and its clause
+  learned, and `search_loop` then cancels to the root as a restart does. Nothing sits in the
+  conflict path, the restart schedule does not know about the budget, and an unlimited search is
+  unchanged decision for decision. MiniSat's shape, a test only where the search is about to
+  branch, was the first version and was dropped: directly consecutive conflicts overshot the
+  budget (1,001 on a budget of 1,000), which a caller that budgets several calls from one total
+  has to work around. The price is one state a restart never produces: when the last conflict
+  taught a unit clause, that literal is on the root trail and not yet propagated. Every entry
+  point already resumes propagation from `qhead`, so the next solve or clause addition finishes
+  it. The cancel is spelled out in the loop function. Calling `Solver.to_root` on the repacked
+  record instead changed how `to_root` is compiled for its other callers: `Rocsat.grow` then
+  copied the activity list on every `new_var` (4.35 MB requested for 1,024 variables instead of
+  0.16 MB), which the allocation fuzz target caught.
+- Preferred literals are soft assumptions that belong to one call. `Solver.solve` appends them to
+  the assumptions, and the loop gives every position a decision level as it already did; a
+  position past the real assumptions whose literal is already false gets a dummy level instead of
+  ending the search. One list that the loop only reads supplies both the branching order and a
+  sign that phase saving cannot overwrite, without a new list in the owner loop or any change to
+  `Branch`. Because the listed literals are always decided first, in order and with their own
+  sign, each model is the lexicographically best one for the list. Keeping the list in the state
+  was the first version and was dropped: a preference set for one query then steered every later
+  one until it was cleared. A pinned bit in the phase byte was rejected earlier: it needs a
   read-modify-write in `Branch.backtrack`, and without a fixed order it promises nothing about
   the model.
 - Arena collection starts when dead words exceed one sixth of total storage, the exact threshold
@@ -76,6 +95,26 @@ and `upstream/` contains the Roc compiler evidence that constrained the represen
 - Assumption UNSAT returns a clause of negated failed assumptions and leaves the solver reusable.
   It does not emit a DRAT empty clause; text DRAT certifies global UNSAT only, whether the clauses
   arrived in one batch or between calls.
+- `solve_with` takes everything that varies per query in one record and returns what the call
+  spent beside its answer, so the state holds no query settings and a caller never diffs
+  counters. `solve` keeps its 0.0.1 signature and is the same search with nothing preferred and
+  no budget. A record was chosen over positional arguments because assumptions and preferences
+  are both `List(I32)` and a swapped pair would type-check.
+- `solve_with` calls `Solver.solve` from two places, one for each side of "is anything preferred".
+  A program whose only use of the search is one call gets all of it inlined into the caller's own
+  function, and through the first client that compiled the same loop about 3% slower: one proof
+  run 40 times retired 20.28 G instructions instead of 19.50 G, and the function holding the loop
+  had 109 call sites of the out-of-line `makeUnique` check instead of 85. With two calls the
+  search stays out of the caller and measures as before. The cause is the optimizer's
+  single-caller inlining, not the search, so re-measure before removing the branch.
+- Clauses reach the engine in one of two layouts. The CLI passes the parser's list of lists, which
+  `add_all` consumes clause by clause as before. The public API passes one flat list in which
+  `Core.undef_lit` ends a clause: `add_clauses` flattens while it decodes, and
+  `add_clauses_flat` takes that layout from the caller with `0` as the terminator, DIMACS's own
+  convention. Literals after the last `0` form a clause instead of an error because the `Error`
+  type is closed and 0.0.1 clients spell it out; a missing terminator would have needed a new tag.
+  Flattening the parser's output as well would leave one layout, and was measured at 30 ns per
+  clause on the canary (251 to 282 ns), so the CLI path keeps its own.
 
 ## Validation and benchmark policy
 

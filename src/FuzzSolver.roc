@@ -123,7 +123,7 @@ FuzzSolver :: [].{
     }
 
     # One transcript turn of the limited and preferred targets: clauses to add, then a query whose
-    # conflict limit and optional new preference list come from `knob`.
+    # conflict budget and optional new preference list come from `knob`.
     turn = Fuzz.map2(
         Fuzz.map2(Fuzz.list(triple, 8), Fuzz.list(Fuzz.u8, 3), |clauses, assumptions| (clauses, assumptions)),
         Fuzz.map2(Fuzz.u8, Fuzz.list(Fuzz.u8, 8), |knob, prefer| (knob, prefer)),
@@ -157,10 +157,11 @@ FuzzSolver :: [].{
         ],
     })
 
-    # Every query runs twice from the same state, without a limit and with one. A limit above the
-    # conflicts the unlimited run met must reproduce that run exactly; otherwise the limited run
-    # may only stop, or report a refutation the unlimited run also reports, and a stopped state must
-    # hold nothing but implied values and still finish with the right answer.
+    # Every query runs from the same state without a budget and with one. Without one,
+    # `solve_with` must be `solve`. A budget above the conflicts that run met must reproduce it
+    # exactly; otherwise the call may only stop, at exactly its budget, or report a refutation the
+    # unlimited run also reports, and a stopped state must hold nothing but implied values and
+    # still finish with the right answer.
     check_limited = |steps| {
         if steps.len() > 8 or !steps.all(turn_fits) {
             return Fuzz.reject
@@ -175,29 +176,33 @@ FuzzSolver :: [].{
             assumptions = item.assumptions.map(|lit| encode(lit, max_vars))
             signed = assumptions.map(Rocsat.to_signed)
             limit = item.knob.to_u64() % 6
-            before = Rocsat.counters($state).conflicts
             (full, answer) = Rocsat.solve($state, signed) ?? crash "valid assumptions were rejected"
             check_answer(full, answer, cnf, assumptions)
-            needed = Rocsat.counters(full).conflicts - before
-            (cut, outcome) = Rocsat.solve_limited($state, signed, limit) ?? crash "valid assumptions were rejected"
-            spent = Rocsat.counters(cut).conflicts - before
-            if limit > needed {
-                if cut != full or outcome != (if answer == Sat { Sat } else { Unsat }) {
-                    crash "a limit above the search's conflicts changed the search"
+            (whole, whole_outcome, needed) = Rocsat.solve_with($state, { assumptions: signed, preferred: [], max_conflicts: U64.highest }) ?? crash "valid assumptions were rejected"
+            if whole != full or whole_outcome != (if answer == Sat { Sat } else { Unsat }) {
+                crash "solve_with without preferences or a budget is not solve"
+            }
+            (cut, outcome, spent) = Rocsat.solve_with($state, { assumptions: signed, preferred: [], max_conflicts: limit }) ?? crash "valid assumptions were rejected"
+            if spent.conflicts > limit {
+                crash "a call met ${spent.conflicts.to_str()} conflicts on a budget of ${limit.to_str()}"
+            }
+            if limit > needed.conflicts {
+                if cut != full or outcome != whole_outcome or spent != needed {
+                    crash "a budget above the search's conflicts changed the search"
                 }
                 $state = cut
             } else {
                 match outcome {
-                    Sat => crash "a limit at or below the search's conflicts answered Sat"
+                    Sat => crash "a budget at or below the search's conflicts answered Sat"
                     Unsat => {
-                        if answer != Unsat or spent > needed or !Rocsat.final_conflict(cut).is_empty() or Brute.solve(cnf) != Ok(Unsat) {
+                        if answer != Unsat or !Rocsat.final_conflict(cut).is_empty() or Brute.solve(cnf) != Ok(Unsat) {
                             crash "a limited search refuted a formula that is not refuted"
                         }
                         $state = cut
                     }
                     Unknown => {
-                        if spent < limit or spent > needed {
-                            crash "a stopped search met ${spent.to_str()} conflicts under limit ${limit.to_str()} when ${needed.to_str()} answer"
+                        if spent.conflicts != limit {
+                            crash "a stopped search met ${spent.conflicts.to_str()} conflicts on a budget of ${limit.to_str()}"
                         }
                         if !Rocsat.final_conflict(cut).is_empty() {
                             crash "a stopped search retained a final conflict"
@@ -241,9 +246,10 @@ FuzzSolver :: [].{
         ],
     })
 
-    # Preferences persist until a step replaces them. Each query is first interrupted by a small
-    # conflict limit and then finished, and every model, including one the interrupted call finds,
-    # must be the lexicographically best model of the clauses and assumptions for the list in force.
+    # A step keeps the preference list or replaces it, and every call is given the list in force.
+    # Each query is first interrupted by a small conflict budget and then finished, and every
+    # model, including one the interrupted call finds, must be the lexicographically best model of
+    # the clauses and assumptions for that list.
     check_preferred = |steps| {
         if steps.len() > 8 or !steps.all(turn_fits) {
             return Fuzz.reject
@@ -257,18 +263,23 @@ FuzzSolver :: [].{
             $clauses = $clauses.concat(encoded)
             if item.knob >= 128 {
                 $prefer = item.prefer.map(|lit| encode(lit, max_vars))
-                $state = Rocsat.set_preferred($state, $prefer.map(Rocsat.to_signed)) ?? crash "valid preferences were rejected"
             }
+            wanted = $prefer.map(Rocsat.to_signed)
             cnf = { num_vars: max_vars, clauses: $clauses }
             assumptions = item.assumptions.map(|lit| encode(lit, max_vars))
             signed = assumptions.map(Rocsat.to_signed)
             restricted = with_assumptions(cnf, assumptions)
-            (cut, outcome) = Rocsat.solve_limited($state, signed, item.knob.to_u64() % 4) ?? crash "valid assumptions were rejected"
+            (cut, outcome, _) = Rocsat.solve_with($state, { assumptions: signed, preferred: wanted, max_conflicts: item.knob.to_u64() % 4 }) ?? crash "valid literals were rejected"
             if outcome == Sat and (Model.satisfies(Rocsat.model(cut), restricted) != Ok({}) or !Brute.lex_best(restricted, $prefer, Rocsat.model(cut))) {
                 crash "an interrupted search returned a model that is not the preferred one"
             }
-            (next, result) = Rocsat.solve(cut, signed) ?? crash "valid assumptions were rejected"
+            (next, finished, _) = Rocsat.solve_with(cut, { assumptions: signed, preferred: wanted, max_conflicts: U64.highest }) ?? crash "valid literals were rejected"
             $state = next
+            result = match finished {
+                Sat => Sat
+                Unsat => Unsat
+                Unknown => crash "a search without a budget stopped unanswered"
+            }
             check_answer($state, result, cnf, assumptions)
             if result == Sat and !Brute.lex_best(restricted, $prefer, Rocsat.model($state)) {
                 crash "the model is not the lexicographically best one for the preferred literals"
@@ -303,8 +314,8 @@ FuzzSolver :: [].{
         ],
     })
 
-    # From any reachable state, one bulk addition and the same clauses added one call at a time
-    # must build equal states, variable growth and root propagation included.
+    # From any reachable state, one bulk addition, nested or flat, and the same clauses added one
+    # call at a time must build equal states, variable growth and root propagation included.
     check_bulk = |batches| {
         if batches.len() > 6 or batches.any(|group| group.clauses.len() > 8 or group.clauses.any(|clause| clause.len() > 4)) {
             return Fuzz.reject
@@ -319,6 +330,10 @@ FuzzSolver :: [].{
             }
             if together != $single {
                 crash "bulk addition and repeated single addition built different states"
+            }
+            flat = clauses.fold([], |lits, clause| lits.concat(clause).append(0))
+            if (Rocsat.add_clauses_flat($state, flat) ?? crash "valid flat clauses were rejected") != together {
+                crash "flat addition and nested addition built different states"
             }
             $state =
                 if group.knob % 2 == 1 {

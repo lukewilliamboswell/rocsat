@@ -21,7 +21,7 @@
 # copy lists in the solver's call shapes: a record parameter is borrowed for the whole call, so a
 # callee that mutates one list and passes the rebuilt record on shares the other fields with the
 # caller's copy; a record returned inside a tuple keeps the caller's old record alive. List writes
-# go through `put`.
+# go through `put`, `put_u8`, and `put_f64`.
 
 import Model
 
@@ -42,9 +42,6 @@ Core :: [].{
         heap : List(U32),
         hpos : List(U32),
         phase : List(U8),
-        # Caller-chosen branching order, read by the search and never mutated by it: after the
-        # assumptions, every solve opens one decision level per listed literal, in order.
-        prefer : List(U32),
         search : Search,
         stats : Stats,
         proof : Proof,
@@ -104,7 +101,6 @@ Core :: [].{
             heap: $heap,
             hpos: $hpos,
             phase: List.repeat(1, n),
-            prefer: [],
             search: { trail_len: 0, dl: 0, qhead: 0, heap_len: n, var_inc: 1.0, simplified: 0, ok: Bool.True },
             stats: { conflicts: 0, decisions: 0, propagations: 0, restarts: 0, reductions: 0, collections: 0, simplifications: 0, simplified_clauses: 0, simplified_literals: 0, deleted_clauses: 0, learnt_literals_before: 0, learnt_literals_after: 0 },
             proof: { on: Bool.False, bytes: [], traced: 0 },
@@ -113,9 +109,23 @@ Core :: [].{
 
     # In-place write; `list.set(i, x) ?? list` is the shape the compiler keeps in place both
     # inside small inlined helpers and inside large functions. An out-of-range index is a
-    # solver bug and leaves the list unchanged.
-    put : List(a), U64, a -> List(a)
+    # solver bug and leaves the list unchanged. One helper per element type: only an optimized
+    # build specializes a helper over `List(a)`, and elsewhere (the dev backend that `roc test`
+    # uses, and constants evaluated at compile time) such a helper copies the list on every call.
+    put : List(U32), U64, U32 -> List(U32)
     put = |list, i, x| {
+        expect i < list.len()
+        list.set(i, x) ?? list
+    }
+
+    put_u8 : List(U8), U64, U8 -> List(U8)
+    put_u8 = |list, i, x| {
+        expect i < list.len()
+        list.set(i, x) ?? list
+    }
+
+    put_f64 : List(F64), U64, F64 -> List(F64)
+    put_f64 = |list, i, x| {
         expect i < list.len()
         list.set(i, x) ?? list
     }
@@ -142,8 +152,8 @@ Core :: [].{
     assign = |value, level, reason, trail, trail_len, lit, from, dl| {
         expect (value.get(lit.to_u64()) ?? 0) == Model.unassigned
         v = lit.shr_wrap(1).to_u64()
-        value1 = put(value, lit.to_u64(), Model.true_val)
-        value2 = put(value1, lit.bitwise_xor(1).to_u64(), Model.false_val)
+        value1 = put_u8(value, lit.to_u64(), Model.true_val)
+        value2 = put_u8(value1, lit.bitwise_xor(1).to_u64(), Model.false_val)
         (value2, put(level, v, dl), put(reason, v, from), put(trail, trail_len, lit), trail_len + 1)
     }
 
@@ -157,8 +167,8 @@ Core :: [].{
         while $i > start {
             $i = $i - 1
             lit = (trail.get($i) ?? 0).to_u64()
-            $value = put($value, lit, Model.unassigned)
-            $value = put($value, lit.bitwise_xor(1), Model.unassigned)
+            $value = put_u8($value, lit, Model.unassigned)
+            $value = put_u8($value, lit.bitwise_xor(1), Model.unassigned)
         }
         ($value, start, dl.min(lvl), start)
     }

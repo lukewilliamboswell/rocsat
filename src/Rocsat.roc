@@ -14,6 +14,8 @@ Rocsat :: [].{
     Result : [Sat, Unsat]
     Outcome : [Sat, Unsat, Unknown]
     Value : [True, False, Unassigned]
+    # What one `solve_with` call did: `conflicts`, `decisions`, `propagations` and `restarts`, and
+    # the clause-database counts that the `stats` line totals.
     Counters : Core.Stats
 
     new : {} -> State
@@ -51,56 +53,92 @@ Rocsat :: [].{
         if clauses.is_empty() {
             return Ok(st)
         }
-        var $decoded = List.with_capacity(clauses.len())
+        var $lits = List.with_capacity(clauses.fold(clauses.len(), |words, signed| words + signed.len()))
         var $num_vars = 0
         for signed in clauses {
-            clause = decode_all(signed)?
-            $decoded = $decoded.append(clause.lits)
-            $num_vars = $num_vars.max(clause.num_vars)
+            for item in signed {
+                decoded = decode(item)?
+                $lits = $lits.append(decoded.lit)
+                $num_vars = $num_vars.max(decoded.num_vars)
+            }
+            $lits = $lits.append(Core.undef_lit)
         }
-        engine = Solver.add_clauses(grow(st.engine, $num_vars), $decoded)
+        engine = Solver.add_clauses(grow(st.engine, $num_vars), Flat($lits))
         Ok({ engine, final: [] })
     }
 
-    # Spelled out instead of calling `solve_limited`: carrying the state through one more
+    # `add_clauses` for clauses that are held in one list: a `0` ends each clause, as in a DIMACS
+    # file, so `[1, -2, 0, 2, 3, 0]` is `[[1, -2], [2, 3]]`. Literals after the last `0` are one
+    # more clause, and a `0` with no literal before it is the empty clause. The only invalid
+    # literal here is `I32.lowest`.
+    add_clauses_flat : State, List(I32) -> Try(State, Error)
+    add_clauses_flat = |st, signed| {
+        if signed.is_empty() {
+            return Ok(st)
+        }
+        var $lits = List.with_capacity(signed.len())
+        var $num_vars = 0
+        for item in signed {
+            if item == 0 {
+                $lits = $lits.append(Core.undef_lit)
+            } else {
+                decoded = decode(item)?
+                $lits = $lits.append(decoded.lit)
+                $num_vars = $num_vars.max(decoded.num_vars)
+            }
+        }
+        engine = Solver.add_clauses(grow(st.engine, $num_vars), Flat($lits))
+        Ok({ engine, final: [] })
+    }
+
+    # Spelled out instead of calling `solve_with`: carrying the state through one more
     # function made every call slower in proportion to the size of the formula.
     solve : State, List(I32) -> Try((State, Result), Error)
     solve = |st, signed| {
         decoded = decode_all(signed)?
-        (engine, outcome, final) = Solver.solve(grow(st.engine, decoded.num_vars), decoded.lits, Solver.no_limit)
+        (engine, outcome, final, _) = Solver.solve(grow(st.engine, decoded.num_vars), decoded.lits, [], Solver.no_limit)
         Ok(({ engine, final }, Solver.answered(outcome)))
     }
 
-    # `solve` under a budget. `Unknown` means the call met `max_conflicts` conflicts and then
-    # reached a point where the search had to branch; conflicts that follow one another without
-    # such a point are all counted first, so a call can overshoot by a few. A search that needs
-    # fewer conflicts than the limit is the search `solve` runs. After `Unknown` the state is at
-    # the root: learned clauses are kept, and `value` reports only literals the clauses imply.
-    solve_limited : State, List(I32), U64 -> Try((State, Outcome), Error)
-    solve_limited = |st, signed, max_conflicts| {
-        decoded = decode_all(signed)?
-        (engine, outcome, final) = Solver.solve(grow(st.engine, decoded.num_vars), decoded.lits, max_conflicts)
-        Ok(({ engine, final }, outcome))
+    # `solve` with everything a single call can be given, and with what the call spent returned
+    # beside its answer. Nothing given here outlives the call.
+    #
+    # `preferred` literals are branched on first, in list order, before any other variable, and no
+    # saved phase overrides their signs. The model of a `Sat` answer is therefore the
+    # lexicographically best one: each listed literal is true unless the clauses, the assumptions,
+    # and the model's values of the literals listed before it together force it false. A variable
+    # listed twice keeps its first entry. Variables not listed carry no promise.
+    #
+    # `max_conflicts` is a budget, and it is exact: the call stops at its `max_conflicts`-th
+    # conflict and never meets another. It then answers `Unknown`, unless that conflict refuted
+    # the clauses, which is `Unsat`. So `Unknown` always comes with `conflicts == max_conflicts`
+    # in the counters, a search that needs fewer conflicts is the search `solve` runs, and a
+    # budget of zero does no work. `U64.highest` is no budget. After `Unknown` the state is at the
+    # root: learned clauses are kept, and `value` reports only literals the clauses imply.
+    #
+    # The counters say what this call did, whatever it answered.
+    solve_with : State, { assumptions : List(I32), preferred : List(I32), max_conflicts : U64 } -> Try((State, Outcome, Counters), Error)
+    solve_with = |st, query| {
+        assumed = decode_all(query.assumptions)?
+        preferred = decode_all(query.preferred)?
+        # Two calls of the search on purpose. A client with a single call of `solve_with` otherwise
+        # gets the whole search inlined into its own calling function, where the same loop was
+        # measured about 3% slower.
+        (engine, outcome, final, spent) =
+            if preferred.lits.is_empty() {
+                Solver.solve(grow(st.engine, assumed.num_vars), assumed.lits, [], query.max_conflicts)
+            } else {
+                Solver.solve(grow(st.engine, assumed.num_vars.max(preferred.num_vars)), assumed.lits, preferred.lits, query.max_conflicts)
+            }
+        Ok(({ engine, final }, outcome, spent))
     }
 
     set_phase : State, I32 -> Try(State, Error)
     set_phase = |st, signed| {
         decoded = decode(signed)?
         engine0 = grow(st.engine, decoded.num_vars)
-        phase = Core.put(engine0.phase, decoded.num_vars - 1, decoded.lit.bitwise_and(1).to_u8_wrap())
+        phase = Core.put_u8(engine0.phase, decoded.num_vars - 1, decoded.lit.bitwise_and(1).to_u8_wrap())
         Ok({ engine: { ..engine0, phase }, final: [] })
-    }
-
-    # Replaces the preferred literals. Every solve branches on them, in list order, before any
-    # other variable, and no saved phase overrides their signs. The model of a `Sat` answer is
-    # therefore the lexicographically best one: each listed literal is true unless the clauses, the
-    # assumptions, and the model's values of the literals listed before it together force it
-    # false. A variable listed twice keeps its first entry. Variables not listed carry no promise.
-    set_preferred : State, List(I32) -> Try(State, Error)
-    set_preferred = |st, signed| {
-        decoded = decode_all(signed)?
-        engine0 = grow(st.engine, decoded.num_vars)
-        Ok({ engine: { ..engine0, prefer: decoded.lits }, final: [] })
     }
 
     value : State, I32 -> Try(Value, Error)
@@ -132,10 +170,6 @@ Rocsat :: [].{
 
     stats : State -> Str
     stats = |st| Solver.stats(st.engine)
-
-    # Totals since the state was created.
-    counters : State -> Counters
-    counters = |st| st.engine.stats
 
     proof_bytes : State -> List(U8)
     proof_bytes = |st| st.engine.proof.bytes
@@ -295,25 +329,30 @@ pigeons = |holes| {
 signed_clauses : Dimacs.Cnf -> List(List(I32))
 signed_clauses = |cnf| cnf.clauses.map(|clause| clause.map(Rocsat.to_signed))
 
-# A limit below what the search needs answers `Unknown` and leaves a root state that a later call
-# finishes; a limit above it runs the very search `solve` runs.
+# `solve_with` on literals that are valid.
+ask : Rocsat.State, List(I32), List(I32), U64 -> (Rocsat.State, Rocsat.Outcome, Rocsat.Counters)
+ask = |st, assumptions, preferred, max_conflicts| Rocsat.solve_with(st, { assumptions, preferred, max_conflicts }) ?? crash "valid literals were rejected"
+
+# With nothing preferred and no budget, `solve_with` is `solve`. A budget below what the search
+# needs answers `Unknown` at exactly that many conflicts and leaves a root state that a later call
+# finishes; a budget above it changes nothing.
 expect {
     st0 = Rocsat.add_clauses(Rocsat.new({}), pigeons(4)) ?? Rocsat.new({})
     (full, answer) = Rocsat.solve(st0, []) ?? (st0, Sat)
-    needed = Rocsat.counters(full).conflicts
-    (cut, early) = Rocsat.solve_limited(st0, [], 3) ?? (st0, Sat)
-    spent = Rocsat.counters(cut).conflicts
-    (resumed, late) = Rocsat.solve(cut, []) ?? (cut, Sat)
-    (same, same_answer) = Rocsat.solve_limited(st0, [], needed + 1) ?? (st0, Sat)
-    answer == Unsat and needed > 10
-    and early == Unknown and spent >= 3 and spent < needed
+    (whole, whole_answer, needed) = ask(st0, [], [], U64.highest)
+    (cut, early, spent) = ask(st0, [], [], 3)
+    (resumed, late, rest) = ask(cut, [], [], needed.conflicts)
+    (same, same_answer, same_spent) = ask(st0, [], [], needed.conflicts + 1)
+    answer == Unsat and whole_answer == Unsat and whole == full and needed.conflicts > 10
+    and early == Unknown and spent.conflicts == 3 and spent.decisions > 0
     and Rocsat.final_conflict(cut).is_empty() and Rocsat.value(cut, 1) == Ok(Unassigned)
-    and late == Unsat and Rocsat.counters(resumed).conflicts > spent
-    and same_answer == Unsat and same == full
+    and late == Unsat and rest.conflicts > 0 and rest.conflicts <= needed.conflicts and Rocsat.final_conflict(resumed).is_empty()
+    and same_answer == Unsat and same == full and same_spent == needed
 }
 
-# Whatever the limit, an answer is the answer of `solve`, and after `Unknown` every assigned
-# value is one the clauses imply.
+# Whatever the budget, the call never meets more conflicts than it was given, an answer is the
+# answer of `solve`, `Unknown` comes at exactly the budget, and every value assigned after it is
+# one the clauses imply.
 expect {
     var $seed = 1
     var $ok = Bool.True
@@ -323,12 +362,14 @@ expect {
         st0 = Rocsat.add_clauses(Rocsat.new({}), signed_clauses(cnf)) ?? Rocsat.new({})
         (_, answer) = Rocsat.solve(st0, []) ?? (st0, Sat)
         for limit in [0, 1, 2, 4] {
-            (cut, outcome) = Rocsat.solve_limited(st0, [], limit) ?? (st0, Sat)
+            (cut, outcome, spent) = ask(st0, [], [], limit)
+            if spent.conflicts > limit { $ok = Bool.False }
             match outcome {
                 Sat => if answer != Sat or Model.satisfies(Rocsat.model(cut), cnf) != Ok({}) { $ok = Bool.False }
                 Unsat => if answer != Unsat { $ok = Bool.False }
                 Unknown => {
                     $unknown = $unknown + 1
+                    if spent.conflicts != limit { $ok = Bool.False }
                     var $lit = 0
                     while $lit < 16 {
                         forced = Rocsat.value(cut, Rocsat.to_signed($lit)) == Ok(True)
@@ -345,38 +386,36 @@ expect {
     $ok and $unknown > 100
 }
 
-# Preferences pick among the models, earliest entry first. Clauses and assumptions still win,
-# a variable's first entry is the one that counts, and an empty list withdraws them.
+# Preferences pick among the models, earliest entry first. Clauses and assumptions still win, a
+# variable's first entry is the one that counts, and each call goes by its own list alone.
 expect {
     st0 = Rocsat.add_clauses(Rocsat.new({}), [[1, 2], [-1, -2]]) ?? Rocsat.new({})
-    st1 = Rocsat.set_preferred(st0, [1, 2]) ?? st0
-    (a, ra) = Rocsat.solve(st1, []) ?? (st1, Unsat)
-    st2 = Rocsat.set_preferred(a, [2, 1, -2]) ?? a
-    (b, rb) = Rocsat.solve(st2, []) ?? (st2, Unsat)
-    (c, rc) = Rocsat.solve(b, [-2]) ?? (b, Unsat)
-    (d, rd) = Rocsat.solve(c, []) ?? (c, Unsat)
-    st3 = Rocsat.add_clause(d, [-2]) ?? d
-    (e, re) = Rocsat.solve(st3, []) ?? (st3, Unsat)
-    st4 = Rocsat.set_preferred(st0, []) ?? st0
+    (a, ra, _) = ask(st0, [], [1, 2], U64.highest)
+    (b, rb, _) = ask(a, [], [2, 1, -2], U64.highest)
+    (c, rc, _) = ask(b, [-2], [2, 1, -2], U64.highest)
+    (d, rd, _) = ask(c, [], [-1], U64.highest)
+    st1 = Rocsat.add_clause(d, [-2]) ?? d
+    (e, re, _) = ask(st1, [], [2, -1], U64.highest)
     ra == Sat and Rocsat.value(a, 1) == Ok(True) and Rocsat.value(a, 2) == Ok(False)
     and rb == Sat and Rocsat.value(b, 1) == Ok(False) and Rocsat.value(b, 2) == Ok(True)
     and rc == Sat and Rocsat.value(c, 1) == Ok(True) and Rocsat.value(c, 2) == Ok(False)
-    and rd == Sat and Rocsat.value(d, 2) == Ok(True)
+    and rd == Sat and Rocsat.value(d, 1) == Ok(False) and Rocsat.value(d, 2) == Ok(True)
     and re == Sat and Rocsat.value(e, 1) == Ok(True) and Rocsat.value(e, 2) == Ok(False)
-    and st4 == st0
 }
 
-# A preference may name a variable no clause has mentioned yet.
+# A preference may name a variable no clause has mentioned yet, and an invalid literal in either
+# list is refused.
 expect {
     st0 = Rocsat.new({})
-    st1 = Rocsat.set_preferred(st0, [3]) ?? st0
-    (st2, result) = Rocsat.solve(st1, []) ?? (st1, Unsat)
-    result == Sat and Rocsat.num_vars(st2) == 3 and Rocsat.value(st2, 3) == Ok(True) and Rocsat.value(st2, 1) == Ok(False)
-    and Rocsat.set_preferred(st0, [1, 0]) == Err(ZeroLiteral)
+    (st1, result, _) = ask(st0, [], [3], U64.highest)
+    result == Sat and Rocsat.num_vars(st1) == 3 and Rocsat.value(st1, 3) == Ok(True) and Rocsat.value(st1, 1) == Ok(False)
+    and Rocsat.solve_with(st0, { assumptions: [], preferred: [1, 0], max_conflicts: 1 }) == Err(ZeroLiteral)
+    and Rocsat.solve_with(st0, { assumptions: [0], preferred: [1], max_conflicts: 1 }) == Err(ZeroLiteral)
 }
 
-# Preferences outlive backtracking, later solves, added clauses, and limited calls: enumerating
-# with blocking clauses yields, each time, the lexicographically best model that is left.
+# The same list given to every call survives whatever the state went through in between,
+# backtracking, added clauses and calls that ran out: enumerating with blocking clauses yields,
+# each time, the lexicographically best model that is left.
 expect {
     var $seed = 1
     var $ok = Bool.True
@@ -389,14 +428,14 @@ expect {
             $rng = Brute.next_rng($rng)
             $prefer = $prefer.append(Brute.rng_below($rng, 16).to_u32_wrap())
         }
-        loaded = Rocsat.add_clauses(Rocsat.new({}), signed_clauses(cnf)) ?? Rocsat.new({})
-        var $state = Rocsat.set_preferred(loaded, $prefer.map(Rocsat.to_signed)) ?? loaded
+        preferred = $prefer.map(Rocsat.to_signed)
+        var $state = Rocsat.add_clauses(Rocsat.new({}), signed_clauses(cnf)) ?? Rocsat.new({})
         var $clauses = cnf.clauses
         var $round = 0
         while $round < 5 {
             current = { num_vars: 8, clauses: $clauses }
-            (cut, _) = Rocsat.solve_limited($state, [], $round) ?? ($state, Unknown)
-            (next, result) = Rocsat.solve(cut, []) ?? (cut, Unsat)
+            (cut, _, _) = ask($state, [], preferred, $round)
+            (next, result, _) = ask(cut, [], preferred, U64.highest)
             $state = next
             match (result, Brute.solve(current)) {
                 (Sat, Ok(Sat(_))) => {
@@ -422,8 +461,9 @@ expect {
     $ok and $models > 200
 }
 
-# One bulk addition builds exactly the state that the same clauses build one call at a time,
-# units, duplicates, tautologies and root conflicts included.
+# One bulk addition, nested or flat, builds exactly the state that the same clauses build one
+# call at a time, units, duplicates, tautologies and root conflicts included. The flat form may
+# leave its last clause open.
 expect {
     var $seed = 1
     var $ok = Bool.True
@@ -432,13 +472,16 @@ expect {
         clauses = signed_clauses(cnf).map_with_index(|clause, i| clause.take_first(1 + (i + $seed) % 3))
         bulk = Rocsat.add_clauses(Rocsat.new({}), clauses)
         var $single = Ok(Rocsat.new({}))
+        var $flat = []
         for clause in clauses {
             $single = match $single {
                 Ok(st) => Rocsat.add_clause(st, clause)
                 Err(err) => Err(err)
             }
+            $flat = $flat.concat(clause).append(0)
         }
         if bulk != $single or bulk == Err(ZeroLiteral) { $ok = Bool.False }
+        if Rocsat.add_clauses_flat(Rocsat.new({}), $flat) != bulk or Rocsat.add_clauses_flat(Rocsat.new({}), $flat.drop_last(1)) != bulk { $ok = Bool.False }
         $seed = $seed + 1
     }
     $ok
@@ -449,29 +492,38 @@ expect {
     st0 = Rocsat.add_clauses(Rocsat.new({}), [[1, 2]]) ?? Rocsat.new({})
     (sat, _) = Rocsat.solve(st0, []) ?? (st0, Unsat)
     (unsat, _) = Rocsat.solve(st0, [-1, -2]) ?? (st0, Sat)
-    Rocsat.add_clauses(sat, []) == Ok(sat) and Rocsat.value(sat, 2) == Ok(True)
-    and Rocsat.add_clauses(unsat, []) == Ok(unsat) and !Rocsat.final_conflict(unsat).is_empty()
+    Rocsat.add_clauses(sat, []) == Ok(sat) and Rocsat.add_clauses_flat(sat, []) == Ok(sat) and Rocsat.value(sat, 2) == Ok(True)
+    and Rocsat.add_clauses(unsat, []) == Ok(unsat) and Rocsat.add_clauses_flat(unsat, []) == Ok(unsat) and !Rocsat.final_conflict(unsat).is_empty()
 }
 
 expect Rocsat.add_clauses(Rocsat.new({}), [[1], [2, 0]]) == Err(ZeroLiteral)
 expect Rocsat.add_clauses(Rocsat.new({}), [[]]).map_ok(|st| Rocsat.solve(st, [])) == Rocsat.add_clause(Rocsat.new({}), []).map_ok(|st| Rocsat.solve(st, []))
 
-# The counters are the numbers the `stats` line prints.
+# In the flat form a zero ends a clause, a zero right after another is the empty clause, and one
+# literal out of range refuses the whole list.
+expect Rocsat.add_clauses_flat(Rocsat.new({}), [1, -2, 0, 2, 3, 0]) == Rocsat.add_clauses(Rocsat.new({}), [[1, -2], [2, 3]])
+expect Rocsat.add_clauses_flat(Rocsat.new({}), [1, 0, 0, 4]) == Rocsat.add_clauses(Rocsat.new({}), [[1], [], [4]])
+expect Rocsat.add_clauses_flat(Rocsat.new({}), [0]) == Rocsat.add_clause(Rocsat.new({}), [])
+expect Rocsat.add_clauses_flat(Rocsat.new({}), [1, 0, I32.lowest, 0]) == Err(LiteralOutOfRange(I32.lowest))
+
+# The counters of a call are what it added to the totals of the `stats` line, and a call that
+# finds its state already refuted spends nothing.
 expect {
     st0 = Rocsat.add_clauses(Rocsat.new({}), pigeons(3)) ?? Rocsat.new({})
-    (st1, result) = Rocsat.solve(st0, []) ?? (st0, Sat)
-    seen = Rocsat.counters(st1)
-    result == Unsat and seen.conflicts > 0 and seen.decisions > 0 and seen.propagations > 0
-    and Rocsat.counters(st0).conflicts == 0
-    and Rocsat.stats(st1).starts_with("c conflicts=${seen.conflicts.to_str()} decisions=${seen.decisions.to_str()} propagations=${seen.propagations.to_str()} restarts=${seen.restarts.to_str()} ")
+    (st1, result, first) = ask(st0, [], [], U64.highest)
+    (st2, again, second) = ask(st1, [1], [], U64.highest)
+    result == Unsat and first.conflicts > 0 and first.decisions > 0 and first.propagations > 0
+    and Rocsat.stats(st1).starts_with("c conflicts=${first.conflicts.to_str()} decisions=${first.decisions.to_str()} propagations=${first.propagations.to_str()} restarts=${first.restarts.to_str()} ")
+    and again == Unsat and second.conflicts == 0 and second.decisions == 0 and second.propagations == 0
+    and Rocsat.stats(st2) == Rocsat.stats(st1)
 }
 
-# A proof is recorded only when asked for, across clause batches and a limited call, and it closes
-# with the empty clause when the clauses are refuted.
+# A proof is recorded only when asked for, across clause batches and a call that ran out, and it
+# closes with the empty clause when the clauses are refuted.
 expect {
     half = Rocsat.add_clauses(Rocsat.new_with_proof({}), [[1, 2], [-1, 2]]) ?? Rocsat.new({})
-    (cut, early) = Rocsat.solve_limited(half, [-2], 0) ?? (half, Sat)
-    whole = Rocsat.add_clauses(cut, [[1, -2], [-1, -2]]) ?? cut
+    (cut, early, _) = ask(half, [-2], [], 0)
+    whole = Rocsat.add_clauses_flat(cut, [1, -2, 0, -1, -2, 0]) ?? cut
     (refuted, answer) = Rocsat.solve(whole, []) ?? (whole, Sat)
     plain = Rocsat.add_clauses(Rocsat.new({}), [[1, 2], [-1, 2], [1, -2], [-1, -2]]) ?? Rocsat.new({})
     (silent, _) = Rocsat.solve(plain, []) ?? (plain, Sat)
