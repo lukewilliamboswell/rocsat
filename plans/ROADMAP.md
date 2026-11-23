@@ -139,3 +139,13 @@ on the nightly suite; revisit those shapes only after the design constraints rec
 - 2026-08-22 — prepared the 0.1.0 source release under Apache-2.0: external API-consumer compilation,
   checksum-pinned compiler installation, clean Linux CI, `make check`, canary, and smoke all pass.
   No solver behavior changed; final smoke retained 21/40 with no measured regression.
+- 2026-11-23 — API additions for a 0.0.2 package release, on branch `solve-support`: `solve_limited`
+  (conflict budget, `Unknown`), `set_preferred` (persistent branching order and sign with a
+  lexicographic model guarantee), `add_clauses`, `counters`, and `new_with_proof`. Unlimited search
+  is unchanged decision for decision on 156 corpus instances; three new roc-fuzz properties check
+  the additions against brute force.
+- 2026-11-23 — heap order after an activity rescale: scaling by 1e-100 made distinct small scores
+  equal (zero after about four rescales) without reordering the heap, so the lower-ID tie rule and
+  the inline `Branch.consistent` check failed on long solves over a few thousand variables
+  (`hanoi5`: after 5 of 12 rescales, at 2 of 28 restarts). `bump_all` now reorders after a rescale.
+  Answers were never affected; solver output is unchanged on 158 corpus instances.

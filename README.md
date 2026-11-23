@@ -86,7 +86,10 @@ SAT-competition `s`/`v` lines, and exits 10 (SAT) / 20 (UNSAT).
 
 `src/fuzz.roc` groups the solver and DIMACS suites with roc-fuzz 0.7.0. The solver suite checks
 batch and incremental results against brute force, including models and failed-assumption cores,
-and checks allocation growth for repeated `new_var` calls. The DIMACS suite covers round trips,
+and checks allocation growth for repeated `new_var` calls. It also checks that a conflict limit
+can only stop a search, never change its answer, that preferred literals give the
+lexicographically best model, and that bulk and single clause addition build equal states. The
+DIMACS suite covers round trips,
 arbitrary body bytes, and the parser's allocation budget for overstated clause counts.
 [roc-fuzz 0.7.0 release](https://github.com/lukewilliamboswell/roc-fuzz/releases/tag/0.7.0)
 
@@ -121,11 +124,56 @@ state2 = Rocsat.add_clause(state1, [2, 3])?
 (state3, result) = Rocsat.solve(state2, [1, -3])?
 ```
 
-The surface provides `new`, `new_var`, `num_vars`, `add_clause`, `set_phase`, `solve`, `value`,
-`model`, `failed`, `final_conflict`, and `stats`. A SAT assignment remains inspectable until the
-next solve or mutation. UNSAT under assumptions leaves the state reusable; a global refutation is
-permanent. `final_conflict` is the implied clause of **negated** failed assumptions, so
-`failed(state, a)` is true exactly when `-a` occurs in that clause.
+The surface provides `new`, `new_with_proof`, `new_var`, `num_vars`, `add_clause`, `add_clauses`,
+`set_phase`, `set_preferred`, `solve`, `solve_limited`, `value`, `model`, `failed`,
+`final_conflict`, `stats`, `counters`, and `proof_bytes`. A SAT assignment remains inspectable until the next solve or mutation. UNSAT under
+assumptions leaves the state reusable; a global refutation is permanent. `final_conflict` is the
+implied clause of **negated** failed assumptions, so `failed(state, a)` is true exactly when `-a`
+occurs in that clause.
+
+Every call consumes the state it is given and returns the next one. Carry on with the returned
+state only: a caller that keeps the old one reachable, for example as a `??` fallback, makes each
+call copy the lists it changes, which turns a long run of single additions quadratic.
+
+`add_clauses(state, clauses)` adds a list of clauses in one call and builds the same state as
+adding them one at a time; if any literal is invalid it adds none. `counters(state)` returns the
+totals behind the `stats` line as a record of `U64` fields: `conflicts`, `decisions`,
+`propagations`, `restarts`, and the clause-database counts. A state made with `new_with_proof`
+instead of `new` records a text DRAT proof, which `proof_bytes(state)` returns.
+
+`solve_limited(state, assumptions, max_conflicts)` is `solve` with a deterministic budget and a
+third answer:
+
+```roc
+(state4, outcome) = Rocsat.solve_limited(state3, [1, -3], 10_000)?
+# outcome is Sat, Unsat, or Unknown
+```
+
+The limit counts conflicts met in that call, not time. A search that needs fewer conflicts than
+the limit is exactly the search `solve` runs, with the same answer and model. Otherwise the call
+answers `Unknown`, unless those conflicts already refuted the clauses. The limit is tested where
+the search is about to branch, so conflicts that follow one another directly can overshoot it by
+a few, and a limit of zero only propagates. After `Unknown` the state is reusable: it keeps the
+learned clauses, `value` reports only literals that the clauses imply, and a later call carries on
+from there.
+
+`set_phase` sets only the sign a variable is first tried with; the search overwrites it as it
+backtracks. `set_preferred(state, literals)` is the persistent control. It replaces the list of
+preferred literals, and every later solve branches on them first, in list order, before any other
+variable:
+
+```roc
+state1 = Rocsat.set_preferred(state0, [5, -2, 7])?
+```
+
+A `Sat` model is then the lexicographically best one for that list. Each preferred literal is
+true unless the clauses, the assumptions, and the model's values of the literals before it force
+it false; the first one is true whenever the clauses and assumptions have a model that makes it
+true. Assumptions outrank preferences, a variable listed twice keeps its first entry, and an empty
+list removes them. This promises nothing about variables that are not listed, and it is an order
+over literals, not a distance: the model need not be the numerically nearest one to a value the
+literals spell out. A fixed branching order can also make a search much slower than the default
+one, which is what `solve_limited` is for.
 
 For shell-driven tests, an incremental transcript uses `+` for clauses and `?` for assumption
 queries:
@@ -145,8 +193,9 @@ not called standard INCCNF. Text DRAT output remains a one-shot/global-UNSAT fac
 
 - The CLI reads DIMACS and incremental transcripts from files; it does not currently read CNF from
   standard input.
-- Proof output is text DRAT for one-shot/global UNSAT solving. Incremental assumption conflicts are
-  exposed as failed-assumption clauses, not proof streams.
+- Proof output is text DRAT for global UNSAT, from the CLI's one-shot `solve` or from a state made
+  with `new_with_proof`; it checks against all clauses added to that state. Incremental assumption
+  conflicts are exposed as failed-assumption clauses, not proof streams.
 - The engine deliberately has no variable-elimination preprocessor. Such elimination would need
   model reconstruction and revival semantics for later incremental clauses.
 - The package exposes the `Rocsat` module as its Roc API. `make api-check` builds and runs a

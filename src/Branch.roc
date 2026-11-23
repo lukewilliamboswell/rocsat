@@ -24,8 +24,8 @@ Branch :: [].{
 
     # Bumps every variable visited by conflict analysis, repairs the heap upward, rescales when
     # needed, and applies the 0.95 decay by increasing the next bump amount.
-    bump_all : List(F64), List(U32), List(U32), List(U32), F64 -> (List(F64), List(U32), List(U32), F64)
-    bump_all = |activity, heap, hpos, touched, var_inc| {
+    bump_all : List(F64), List(U32), List(U32), U64, List(U32), F64 -> (List(F64), List(U32), List(U32), F64)
+    bump_all = |activity, heap, hpos, heap_len, touched, var_inc| {
         var $activity = activity
         var $heap = heap
         var $hpos = hpos
@@ -60,10 +60,58 @@ Branch :: [].{
                 $activity = Core.put($activity, $v, ($activity.get($v) ?? 0) * 1.0e-100)
                 $v = $v + 1
             }
-            ($activity, $heap, $hpos, next_inc * 1.0e-100)
+            # Scaling rounds, and underflows small scores to zero, so scores that differed can now
+            # be equal while the heap still holds them in their old order.
+            (ordered, positions) = reorder($activity, $heap, $hpos, heap_len)
+            ($activity, ordered, positions, next_inc * 1.0e-100)
         } else {
             ($activity, $heap, $hpos, next_inc)
         }
+    }
+
+    # Restores the heap order of the live prefix bottom-up; an ordered heap is left as it is.
+    reorder : List(F64), List(U32), List(U32), U64 -> (List(U32), List(U32))
+    reorder = |activity, heap, hpos, heap_len| {
+        var $heap = heap
+        var $hpos = hpos
+        var $start = heap_len / 2
+        while $start > 0 {
+            $start = $start - 1
+            var $i = $start
+            var $down = Bool.True
+            while $down {
+                left = 2 * $i + 1
+                if left >= heap_len {
+                    $down = Bool.False
+                } else {
+                    right = left + 1
+                    lv = ($heap.get(left) ?? 0).to_u64()
+                    best =
+                        if right < heap_len {
+                            rv = ($heap.get(right) ?? 0).to_u64()
+                            ls = activity.get(lv) ?? 0
+                            rs = activity.get(rv) ?? 0
+                            if rs > ls or (rs == ls and rv < lv) { right } else { left }
+                        } else {
+                            left
+                        }
+                    bv = ($heap.get(best) ?? 0).to_u64()
+                    mv = ($heap.get($i) ?? 0).to_u64()
+                    bs = activity.get(bv) ?? 0
+                    ms = activity.get(mv) ?? 0
+                    if bs > ms or (bs == ms and bv < mv) {
+                        $heap = Core.put($heap, $i, bv.to_u32_wrap())
+                        $heap = Core.put($heap, best, mv.to_u32_wrap())
+                        $hpos = Core.put($hpos, bv, $i.to_u32_wrap())
+                        $hpos = Core.put($hpos, mv, best.to_u32_wrap())
+                        $i = best
+                    } else {
+                        $down = Bool.False
+                    }
+                }
+            }
+        }
+        ($heap, $hpos)
     }
 
     # Removes heap maxima until it finds an unassigned variable. The chosen variable is removed;
@@ -198,7 +246,7 @@ expect {
 
 expect {
     (activity, heap, hpos, len) = Branch.new(5)
-    (activity1, heap1, hpos1, inc1) = Branch.bump_all(activity, heap, hpos, [3, 3, 1], 1.0)
+    (activity1, heap1, hpos1, inc1) = Branch.bump_all(activity, heap, hpos, len, [3, 3, 1], 1.0)
     (heap2, hpos2, len2, v) = Branch.pick(activity1, heap1, hpos1, len, List.repeat(Model.unassigned, 10), 5)
     v == 3 and (activity1.get(3) ?? 0) == 2 and inc1 > 1 and Branch.consistent(activity1, heap2, hpos2, len2)
 }
@@ -218,7 +266,34 @@ expect {
 }
 
 expect {
-    (activity, heap, hpos, _) = Branch.new(1)
-    (activity1, _, _, inc1) = Branch.bump_all(activity, heap, hpos, [0], 1.0e101)
+    (activity, heap, hpos, len) = Branch.new(1)
+    (activity1, _, _, inc1) = Branch.bump_all(activity, heap, hpos, len, [0], 1.0e101)
     (activity1.get(0) ?? 0) < 100 and inc1 < 100
+}
+
+# A rescale that underflows keeps the heap ordered. Variable 2 (score 2e-300) is the heap parent of
+# variable 1 (1e-300); bumping variable 3 past 1e100 scales both to zero, and equal scores must
+# then come out lowest id first.
+expect {
+    (activity, heap, hpos, len) = Branch.new(4)
+    (a1, h1, p1, _) = Branch.bump_all(activity, heap, hpos, len, [2], 2.0e-300)
+    (a2, h2, p2, _) = Branch.bump_all(a1, h1, p1, len, [1], 1.0e-300)
+    (a3, h3, p3, _) = Branch.bump_all(a2, h2, p2, len, [3], 1.0e101)
+    unassigned = List.repeat(Model.unassigned, 8)
+    (h4, p4, len4, first) = Branch.pick(a3, h3, p3, len, unassigned, 4)
+    (h5, p5, len5, second) = Branch.pick(a3, h4, p4, len4, unassigned, 4)
+    (h6, p6, len6, third) = Branch.pick(a3, h5, p5, len5, unassigned, 4)
+    (_, _, _, fourth) = Branch.pick(a3, h6, p6, len6, unassigned, 4)
+    h2 == [2, 1, 0, 3] and a3 == [0, 0, 0, 10] and Branch.consistent(a3, h3, p3, len)
+    and [first, second, third, fourth] == [3, 0, 1, 2]
+}
+
+# Reordering only touches the live prefix and leaves an ordered heap alone.
+expect {
+    (activity, heap, hpos, len) = Branch.new(6)
+    (a1, h1, p1, _) = Branch.bump_all(activity, heap, hpos, len, [4, 2, 4, 5], 1.0)
+    (h2, p2) = Branch.reorder(a1, h1, p1, len)
+    out = Branch.absent
+    (h3, p3) = Branch.reorder([0, 0, 0, 0, 0, 0], [5, 4, 3, 2, 1, 0], [out, out, out, 2, 1, 0], 3)
+    h2 == h1 and p2 == p1 and h3 == [3, 4, 5, 2, 1, 0] and p3 == [out, out, out, 0, 1, 2]
 }

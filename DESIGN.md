@@ -25,6 +25,11 @@ and `upstream/` contains the Roc compiler evidence that constrained the represen
 - Branching is deterministic EVSIDS with lower variable IDs winning equal-activity ties. Full phase
   saving occurs while erasing the backtracked trail suffix. Conflict analysis returns every visited
   variable for activity bumps; minimization does not change that bump set.
+- An activity rescale rounds, and after about four of them (18,000 conflicts) underflows scores
+  that were bumped only early to zero, so distinct scores become equal while the heap still holds
+  them in their old order. `Branch.bump_all` therefore reorders the heap after a rescale. Without
+  that the heap stayed a valid max-heap on activity, so only the lower-ID tie rule was broken and
+  no answer could change, but the inline heap check failed at later restarts.
 - Restarts use the Luby sequence with a 1,000-conflict unit. MiniSat's unit 100 remained pathological
   on `hole10` even after lifecycle support (128.59 s and 2.37 million conflicts), while unit 1,000
   completed it in 41.62 s and 847 thousand conflicts. A 100,000-conflict unit was rejected because
@@ -39,6 +44,21 @@ and `upstream/` contains the Roc compiler evidence that constrained the represen
 - `Reduce.maybe` is an unconditional ownership boundary. Moving its condition into the owner loop
   retained list aliases on the pinned compiler and slowed `hole8` from 1.95 s to 13.3 s even when
   no reduction occurred.
+- A conflict limit shortens the restart interval instead of adding a test to the conflict path:
+  when the budget is spent, the search performs the restart's cancel-to-root and stops rather than
+  resuming. A stopped state is therefore one a restart also produces, with nothing pending, and
+  an unlimited search is unchanged decision for decision. The cost is MiniSat's semantics: the
+  limit is tested only where the search is about to branch, so directly consecutive conflicts
+  overshoot it.
+- Preferred literals are soft assumptions. `Solver.solve` appends them to the assumptions, and the
+  loop gives every position a decision level as it already did; a position past the real
+  assumptions whose literal is already false gets a dummy level instead of ending the search. One
+  list that the loop only reads supplies both the branching order and a sign that phase saving
+  cannot overwrite, without a new list in the owner loop or any change to `Branch`. Because the
+  listed literals are always decided first, in order and with their own sign, each model is the
+  lexicographically best one for the list. A pinned bit in the phase byte was rejected: it needs a
+  read-modify-write in `Branch.backtrack`, and without a fixed order it promises nothing about
+  the model.
 - Arena collection starts when dead words exceed one sixth of total storage, the exact threshold
   that restores total arena size to at most 1.2 times live storage after collection. Reduction
   rebuilds watches before tracing deletions, so no stale watcher can reach a deleted clause.
@@ -54,7 +74,8 @@ and `upstream/` contains the Roc compiler evidence that constrained the represen
   second model. Assumption positions each receive a decision level, including dummy levels for an
   already-true assumption, so final analysis remains MiniSat-compatible.
 - Assumption UNSAT returns a clause of negated failed assumptions and leaves the solver reusable.
-  It does not emit a DRAT empty clause; text DRAT is reserved for one-shot global UNSAT.
+  It does not emit a DRAT empty clause; text DRAT certifies global UNSAT only, whether the clauses
+  arrived in one batch or between calls.
 
 ## Validation and benchmark policy
 

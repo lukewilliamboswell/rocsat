@@ -42,6 +42,9 @@ Core :: [].{
         heap : List(U32),
         hpos : List(U32),
         phase : List(U8),
+        # Caller-chosen branching order, read by the search and never mutated by it: after the
+        # assumptions, every solve opens one decision level per listed literal, in order.
+        prefer : List(U32),
         search : Search,
         stats : Stats,
         proof : Proof,
@@ -101,6 +104,7 @@ Core :: [].{
             heap: $heap,
             hpos: $hpos,
             phase: List.repeat(1, n),
+            prefer: [],
             search: { trail_len: 0, dl: 0, qhead: 0, heap_len: n, var_inc: 1.0, simplified: 0, ok: Bool.True },
             stats: { conflicts: 0, decisions: 0, propagations: 0, restarts: 0, reductions: 0, collections: 0, simplifications: 0, simplified_clauses: 0, simplified_literals: 0, deleted_clauses: 0, learnt_literals_before: 0, learnt_literals_after: 0 },
             proof: { on: Bool.False, bytes: [], traced: 0 },

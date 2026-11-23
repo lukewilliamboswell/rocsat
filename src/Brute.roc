@@ -35,6 +35,23 @@ Brute :: [].{
     lit_is_false : Model.Assignment, U32 -> Bool
     lit_is_false = |assign, lit| Model.lit_is_true(assign, lit.bitwise_xor(1))
 
+    # Whether the model `assign` makes each literal of `prefer` true unless the formula together
+    # with the model's values of the literals listed before it has no model in which it is true.
+    lex_best : Dimacs.Cnf, List(U32), Model.Assignment -> Bool
+    lex_best = |cnf, prefer, assign| {
+        var $clauses = cnf.clauses
+        var $best = Bool.True
+        for lit in prefer {
+            if Model.lit_is_true(assign, lit) {
+                $clauses = $clauses.append([lit])
+            } else {
+                if solve({ ..cnf, clauses: $clauses.append([lit]) }) != Ok(Unsat) { $best = Bool.False }
+                $clauses = $clauses.append([lit.bitwise_xor(1)])
+            }
+        }
+        $best
+    }
+
     # Seeded random 3-CNF generator (Knuth's MMIX LCG), shared by the differential tests.
     random_cnf : U64, U64, U64 -> Dimacs.Cnf
     random_cnf = |seed, num_vars, num_clauses| {
@@ -70,6 +87,14 @@ expect Brute.solve({ num_vars: 3, clauses: [[0, 2], [1, 4], [3, 5], [4, 5]] }) =
 expect Brute.solve({ num_vars: 2, clauses: [[0, 2], [0, 3], [1, 2], [1, 3]] }) == Ok(Unsat)
 expect Brute.solve({ num_vars: 25, clauses: [] }) == Err(TooManyVars(25))
 expect Brute.solve({ num_vars: 2, clauses: [[3, 1]] }) == Ok(Sat([1, 2]))
+
+# (1 ∨ 2)(¬1 ∨ ¬2): either variable may be true, and whichever is listed first decides the other.
+expect {
+    cnf = { num_vars: 2, clauses: [[0, 2], [1, 3]] }
+    Brute.lex_best(cnf, [0, 2], [1, 2]) and !Brute.lex_best(cnf, [0, 2], [2, 1])
+    and Brute.lex_best(cnf, [2, 0], [2, 1]) and Brute.lex_best(cnf, [1], [2, 1])
+    and Brute.lex_best(cnf, [0, 1], [1, 2]) and !Brute.lex_best(cnf, [1, 0], [1, 2])
+}
 
 expect {
     var $seed = 1

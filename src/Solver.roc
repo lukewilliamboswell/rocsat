@@ -49,7 +49,7 @@ Solver :: [].{
     add_clauses : Core.State, List(List(U32)) -> Core.State
     add_clauses = |input, clauses| {
         st0 = to_root(input)
-        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, search, stats: counters, proof } = st0
+        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, prefer, search, stats: counters, proof } = st0
         expect search.dl == 0
         (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, bytes1, sc) =
             add_all(arena, pool, wofs, wlen, wcap, value, level, reason, trail, proof.bytes, { trail_len: search.trail_len, qhead: search.qhead, ok: search.ok, propagations: counters.propagations, proof_on: proof.on, traced: proof.traced }, clauses)
@@ -69,6 +69,7 @@ Solver :: [].{
             heap,
             hpos,
             phase,
+            prefer,
             search: { ..search, trail_len: sc.trail_len, qhead: sc.qhead, ok: sc.ok },
             stats: { ..counters, propagations: sc.propagations },
             proof: { ..proof, bytes: bytes1, traced: sc.traced },
@@ -194,14 +195,29 @@ Solver :: [].{
         ($bytes, trail_len)
     }
 
-    solve : Core.State, List(U32) -> (Core.State, [Sat, Unsat], List(U32))
-    solve = |input, assumptions| {
+    no_limit : U64
+    no_limit = U64.highest
+
+    # The answer of a search that ran under `no_limit`.
+    answered : [Sat, Unsat, Unknown] -> [Sat, Unsat]
+    answered = |status| match status {
+        Sat => Sat
+        Unsat => Unsat
+        Unknown => crash "rocsat: a search without a conflict limit stopped unanswered"
+    }
+
+    # Searches under `assumptions`, branching on the state's `prefer` literals before any other
+    # variable. `Unknown` means the call met `max_conflicts` conflicts first; the state is then at
+    # level 0 with everything it learned, exactly as after a restart.
+    solve : Core.State, List(U32), U64 -> (Core.State, [Sat, Unsat, Unknown], List(U32))
+    solve = |input, assumptions, max_conflicts| {
         rooted = to_root(input)
-        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim: old_trail_lim, seen, activity, heap, hpos, phase, search, stats: counters, proof } = rooted
-        needed_levels = level.len() + assumptions.len()
+        { arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim: old_trail_lim, seen, activity, heap, hpos, phase, prefer, search, stats: counters, proof } = rooted
+        levels = assumptions.concat(prefer)
+        needed_levels = level.len() + levels.len()
         trail_lim = if old_trail_lim.len() < needed_levels { old_trail_lim.concat(List.repeat(0, needed_levels - old_trail_lim.len())) } else { old_trail_lim }
         (arena1, pool1, wofs1, wlen1, wcap1, value1, level1, reason1, trail1, trail_lim1, seen1, activity1, heap1, hpos1, phase1, bytes1, sc, status, final) =
-            search_loop(arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, proof.bytes, { trail_len: search.trail_len, dl: search.dl, qhead: search.qhead, heap_len: search.heap_len, var_inc: search.var_inc, simplified: search.simplified, ok: search.ok, conflicts: counters.conflicts, decisions: counters.decisions, propagations: counters.propagations, restarts: counters.restarts, reductions: counters.reductions, collections: counters.collections, simplifications: counters.simplifications, simplified_clauses: counters.simplified_clauses, simplified_literals: counters.simplified_literals, deleted_clauses: counters.deleted_clauses, learnt_literals_before: counters.learnt_literals_before, learnt_literals_after: counters.learnt_literals_after, proof_on: proof.on, traced: proof.traced }, assumptions)
+            search_loop(arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, proof.bytes, { trail_len: search.trail_len, dl: search.dl, qhead: search.qhead, heap_len: search.heap_len, var_inc: search.var_inc, simplified: search.simplified, ok: search.ok, conflicts: counters.conflicts, decisions: counters.decisions, propagations: counters.propagations, restarts: counters.restarts, reductions: counters.reductions, collections: counters.collections, simplifications: counters.simplifications, simplified_clauses: counters.simplified_clauses, simplified_literals: counters.simplified_literals, deleted_clauses: counters.deleted_clauses, learnt_literals_before: counters.learnt_literals_before, learnt_literals_after: counters.learnt_literals_after, proof_on: proof.on, traced: proof.traced }, levels, assumptions.len(), counters.conflicts.plus_saturated(max_conflicts))
         st = {
             arena: arena1,
             pool: pool1,
@@ -218,6 +234,7 @@ Solver :: [].{
             heap: heap1,
             hpos: hpos1,
             phase: phase1,
+            prefer,
             search: { trail_len: sc.trail_len, dl: sc.dl, qhead: sc.qhead, heap_len: sc.heap_len, var_inc: sc.var_inc, simplified: sc.simplified, ok: sc.ok },
             stats: { conflicts: sc.conflicts, decisions: sc.decisions, propagations: sc.propagations, restarts: sc.restarts, reductions: sc.reductions, collections: sc.collections, simplifications: sc.simplifications, simplified_clauses: sc.simplified_clauses, simplified_literals: sc.simplified_literals, deleted_clauses: sc.deleted_clauses, learnt_literals_before: sc.learnt_literals_before, learnt_literals_after: sc.learnt_literals_after },
             proof: { ..proof, bytes: bytes1, traced: sc.traced },
@@ -230,9 +247,12 @@ Solver :: [].{
     restart_first : U64
     restart_first = 1000
 
-    # The CDCL loop on the unpacked state.
-    search_loop : List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), List(U8), SearchScalars, List(U32) -> (List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), List(U8), SearchScalars, [Sat, Unsat], List(U32))
-    search_loop = |arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, bytes, sc, assumptions| {
+    # The CDCL loop on the unpacked state. `levels[i]` owns decision level `i + 1`: the first `hard`
+    # are assumptions, whose falsity ends the search, and the rest are preferences, which are
+    # skipped when already assigned. The conflict limit `stop_at` is an absolute conflict count; it
+    # shortens the restart interval, so running out is a restart that does not resume.
+    search_loop : List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), List(U8), SearchScalars, List(U32), U64, U64 -> (List(U32), List(U32), List(U32), List(U32), List(U32), List(U8), List(U32), List(U32), List(U32), List(U32), List(U8), List(F64), List(U32), List(U32), List(U8), List(U8), SearchScalars, [Sat, Unsat, Unknown], List(U32))
+    search_loop = |arena, pool, wofs, wlen, wcap, value, level, reason, trail, trail_lim, seen, activity, heap, hpos, phase, bytes, sc, levels, hard, stop_at| {
         num_vars = level.len()
         proof_on = sc.proof_on
         var $arena = arena
@@ -272,12 +292,13 @@ Solver :: [].{
         var $learnt_literals_before = sc.learnt_literals_before
         var $learnt_literals_after = sc.learnt_literals_after
         var $restart_conflicts = 0
-        var $restart_limit = restart_first * luby(2, sc.restarts)
+        var $restart_limit = (restart_first * luby(2, sc.restarts)).min(stop_at - sc.conflicts)
         var $bytes = bytes
         var $traced = sc.traced
         var $final = []
         var $status = if sc.ok { Unknown } else { Unsat }
-        while $status == Unknown {
+        var $out_of_conflicts = Bool.False
+        while $status == Unknown and !$out_of_conflicts {
             dl = $dl.to_u32_wrap()
             (a, p, wo, wl, wc, va, le, re, tr, tl, q, props, confl) = Propagate.propagate($arena, $pool, $wofs, $wlen, $wcap, $value, $level, $reason, $trail, $trail_len, $qhead, dl, $props)
             $arena = a
@@ -307,7 +328,7 @@ Solver :: [].{
                     $arena = Core.mark_used_all($arena, used_clauses)
                     $learnt_literals_before = $learnt_literals_before + before
                     $learnt_literals_after = $learnt_literals_after + learnt.len()
-                    (activity2, heap2, hpos2, var_inc2) = Branch.bump_all($activity, $heap, $hpos, touched, $var_inc)
+                    (activity2, heap2, hpos2, var_inc2) = Branch.bump_all($activity, $heap, $hpos, $heap_len, touched, $var_inc)
                     $activity = activity2
                     $heap = heap2
                     $hpos = hpos2
@@ -363,9 +384,13 @@ Solver :: [].{
                     $hpos = hpos3
                     $phase = phase3
                     $heap_len = heap_len3
-                    $restarts = $restarts + 1
-                    $restart_conflicts = 0
-                    $restart_limit = restart_first * luby(2, $restarts)
+                    if $conflicts >= stop_at {
+                        $out_of_conflicts = Bool.True
+                    } else {
+                        $restarts = $restarts + 1
+                        $restart_conflicts = 0
+                        $restart_limit = (restart_first * luby(2, $restarts)).min(stop_at - $conflicts)
+                    }
                     expect Branch.consistent($activity, $heap, $hpos, $heap_len)
                 } else {
                     if $dl == 0 and proof_on {
@@ -405,12 +430,12 @@ Solver :: [].{
                         $deleted_clauses = $deleted_clauses + deleted
                         $next_reduce = $next_reduce + 2000
                     }
-                    var $made_assumption = Bool.False
-                    while $dl < assumptions.len() and !$made_assumption and $status == Unknown {
-                        assumption = assumptions.get($dl) ?? 0
-                        val = $value.get(assumption.to_u64()) ?? Model.unassigned
-                        if val == Model.false_val {
-                            (seen7, final7) = Analyze.final($arena, $trail, $trail_len, $trail_lim, $level, $reason, $seen, assumption.bitwise_xor(1))
+                    var $decided = Bool.False
+                    while $dl < levels.len() and !$decided and $status == Unknown {
+                        lit = levels.get($dl) ?? 0
+                        val = $value.get(lit.to_u64()) ?? Model.unassigned
+                        if val == Model.false_val and $dl < hard {
+                            (seen7, final7) = Analyze.final($arena, $trail, $trail_len, $trail_lim, $level, $reason, $seen, lit.bitwise_xor(1))
                             $seen = seen7
                             $final = final7
                             $status = Unsat
@@ -419,17 +444,17 @@ Solver :: [].{
                             $dl = $dl + 1
                             if val == Model.unassigned {
                                 $decisions = $decisions + 1
-                                (va7, le7, re7, tr7, tl7) = Core.assign($value, $level, $reason, $trail, $trail_len, assumption, Core.none, $dl.to_u32_wrap())
+                                (va7, le7, re7, tr7, tl7) = Core.assign($value, $level, $reason, $trail, $trail_len, lit, Core.none, $dl.to_u32_wrap())
                                 $value = va7
                                 $level = le7
                                 $reason = re7
                                 $trail = tr7
                                 $trail_len = tl7
-                                $made_assumption = Bool.True
+                                $decided = Bool.True
                             }
                         }
                     }
-                    if $status == Unknown and !$made_assumption {
+                    if $status == Unknown and !$decided {
                         (heap3, hpos3, heap_len3, v) = Branch.pick($activity, $heap, $hpos, $heap_len, $value, num_vars)
                         $heap = heap3
                         $hpos = hpos3
@@ -453,7 +478,7 @@ Solver :: [].{
             }
         }
         scalars = { trail_len: $trail_len, dl: $dl, qhead: $qhead, heap_len: $heap_len, var_inc: $var_inc, simplified: $simplified, ok: $ok, conflicts: $conflicts, decisions: $decisions, propagations: $props, restarts: $restarts, reductions: $reductions, collections: $collections, simplifications: $simplifications, simplified_clauses: $simplified_clauses, simplified_literals: $simplified_literals, deleted_clauses: $deleted_clauses, learnt_literals_before: $learnt_literals_before, learnt_literals_after: $learnt_literals_after, proof_on, traced: $traced }
-        ($arena, $pool, $wofs, $wlen, $wcap, $value, $level, $reason, $trail, $trail_lim, $seen, $activity, $heap, $hpos, $phase, $bytes, scalars, if $status == Sat { Sat } else { Unsat }, $final)
+        ($arena, $pool, $wofs, $wlen, $wcap, $value, $level, $reason, $trail, $trail_lim, $seen, $activity, $heap, $hpos, $phase, $bytes, scalars, $status, $final)
     }
 
     # `1,1,2,1,1,2,4,...` for `y = 2`.
@@ -501,8 +526,8 @@ Solver :: [].{
 
     solve_cnf : Dimacs.Cnf -> [Sat(Model.Assignment), Unsat]
     solve_cnf = |cnf| {
-        (st, r, _) = solve(from_cnf(cnf, Bool.False), [])
-        match r {
+        (st, r, _) = solve(from_cnf(cnf, Bool.False), [], no_limit)
+        match answered(r) {
             Sat => Sat(model(st))
             Unsat => Unsat
         }
@@ -624,8 +649,8 @@ expect Solver.solve_cnf({ num_vars: 3, clauses: [[0, 2, 4], [1, 2, 4], [0, 3, 4]
 # Root implications can reject an assumption without poisoning the next call.
 expect {
     st0 = Solver.from_cnf({ num_vars: 1, clauses: [[0]] }, Bool.False)
-    (st1, r1, final1) = Solver.solve(st0, [1])
-    (st2, r2, final2) = Solver.solve(st1, [0])
+    (st1, r1, final1) = Solver.solve(st0, [1], Solver.no_limit)
+    (st2, r2, final2) = Solver.solve(st1, [0], Solver.no_limit)
     r1 == Unsat and final1 == [0] and st1.search.ok
     and r2 == Sat and final2.is_empty() and Solver.model(st2) == [Model.true_val]
 }
@@ -633,9 +658,9 @@ expect {
 # Contradictory assumptions and implication chains return clauses negating only assumptions.
 expect {
     empty = Solver.new(1, Bool.False)
-    (st1, r1, final1) = Solver.solve(empty, [0, 1])
+    (st1, r1, final1) = Solver.solve(empty, [0, 1], Solver.no_limit)
     chain = Solver.from_cnf({ num_vars: 2, clauses: [[1, 2]] }, Bool.False)
-    (st2, r2, final2) = Solver.solve(chain, [0, 3])
+    (st2, r2, final2) = Solver.solve(chain, [0, 3], Solver.no_limit)
     r1 == Unsat and final1 == [0, 1] and st1.search.ok
     and r2 == Unsat and final2 == [2, 1] and st2.search.ok
 }
@@ -643,23 +668,132 @@ expect {
 # Already-true assumptions still occupy dummy levels, and another solve first restores level 0.
 expect {
     st0 = Solver.from_cnf({ num_vars: 2, clauses: [[0]] }, Bool.False)
-    (st1, r1, _) = Solver.solve(st0, [0, 0])
-    (st2, r2, _) = Solver.solve(st1, [])
+    (st1, r1, _) = Solver.solve(st0, [0, 0], Solver.no_limit)
+    (st2, r2, _) = Solver.solve(st1, [], Solver.no_limit)
     r1 == Sat and st1.search.dl >= 2 and r2 == Sat and st2.search.ok
 }
 
 # Only a global root conflict permanently marks the state UNSAT and has no assumption conflict.
 expect {
     st0 = Solver.from_cnf({ num_vars: 1, clauses: [[0], [1]] }, Bool.False)
-    (st1, result, final) = Solver.solve(st0, [0])
+    (st1, result, final) = Solver.solve(st0, [0], Solver.no_limit)
     result == Unsat and final.is_empty() and !st1.search.ok
 }
 
 # Adding after SAT cancels decisions and propagates the new root clause.
 expect {
-    (sat, result, _) = Solver.solve(Solver.from_cnf({ num_vars: 2, clauses: [[0, 2]] }, Bool.False), [])
+    (sat, result, _) = Solver.solve(Solver.from_cnf({ num_vars: 2, clauses: [[0, 2]] }, Bool.False), [], Solver.no_limit)
     added = Solver.add_clauses(sat, [[0]])
     result == Sat and added.search.dl == 0 and Solver.trail_of(added).contains(0)
+}
+
+# A conflict limit above what the search needs changes nothing. At or below that count the call
+# never answers `Sat`; it stops at the root with consistent structures, and resuming it without a
+# limit gives the unlimited answer.
+expect {
+    var $seed = 1
+    var $ok = Bool.True
+    var $stopped = 0
+    while $seed <= 200 {
+        cnf = Brute.random_cnf($seed, 8, 34)
+        st0 = Solver.from_cnf(cnf, Bool.False)
+        (full, answer, _) = Solver.solve(st0, [], Solver.no_limit)
+        needed = full.stats.conflicts
+        (same, same_answer, _) = Solver.solve(st0, [], needed + 1)
+        if same_answer != answer or same != full { $ok = Bool.False }
+        var $limit = 0
+        while $limit <= needed {
+            (cut, cut_answer, final) = Solver.solve(st0, [], $limit)
+            match cut_answer {
+                Sat => { $ok = Bool.False }
+                Unsat => if answer != Unsat { $ok = Bool.False }
+                Unknown => {
+                    $stopped = $stopped + 1
+                    (resumed, resumed_answer, _) = Solver.solve(cut, [], Solver.no_limit)
+                    if cut.search.dl != 0 or !cut.search.ok or cut.search.qhead != cut.search.trail_len or !final.is_empty()
+                        or cut.stats.conflicts < $limit or cut.stats.conflicts > needed or cut.stats.restarts != 0
+                        or !Core.watches_consistent(cut.arena, cut.pool, cut.wofs, cut.wlen)
+                        or !Branch.consistent(cut.activity, cut.heap, cut.hpos, cut.search.heap_len)
+                        or resumed_answer != answer
+                        or (answer == Sat and Model.satisfies(Solver.model(resumed), cnf) != Ok({})) {
+                        $ok = Bool.False
+                    }
+                }
+            }
+            $limit = $limit + 1
+        }
+        $seed = $seed + 1
+    }
+    $ok and $stopped > 200
+}
+
+# Preferred literals are decided first and in order whatever the saved phases say, so each model
+# is the lexicographically best one for the list, also below assumptions and after a limit cut the
+# search short.
+expect {
+    var $seed = 1
+    var $ok = Bool.True
+    var $sat = 0
+    while $seed <= 300 {
+        cnf = Brute.random_cnf($seed, 8, 20 + 7 * ($seed % 3))
+        var $rng = Brute.next_rng($seed)
+        var $prefer = []
+        while $prefer.len() < 1 + $seed % 8 {
+            $rng = Brute.next_rng($rng)
+            $prefer = $prefer.append(Brute.rng_below($rng, 16).to_u32_wrap())
+        }
+        $rng = Brute.next_rng($rng)
+        assumptions = if $seed % 2 == 0 { [] } else { [Brute.rng_below($rng, 16).to_u32_wrap()] }
+        assumed = { ..cnf, clauses: cnf.clauses.concat(assumptions.map(|lit| [lit])) }
+        st0 = { ..Solver.from_cnf(cnf, Bool.False), prefer: $prefer }
+        (cut, _, _) = Solver.solve(st0, assumptions, $seed % 4)
+        (st1, answer, _) = Solver.solve(cut, assumptions, Solver.no_limit)
+        match (answer, Brute.solve(assumed)) {
+            (Sat, Ok(Sat(_))) => {
+                $sat = $sat + 1
+                model = Solver.model(st1)
+                if Model.satisfies(model, assumed) != Ok({}) or !Brute.lex_best(assumed, $prefer, model) { $ok = Bool.False }
+            }
+            (Unsat, Ok(Unsat)) => {}
+            _ => { $ok = Bool.False }
+        }
+        $seed = $seed + 1
+    }
+    $ok and $sat > 100
+}
+
+# The branching heap stays ordered across an activity rescale. Every variable starts with a
+# distinct score small enough to underflow, highest id on top, and the bump amount starts just
+# below the rescale threshold, so the first conflicts scale all unassigned scores to zero. A
+# conflict limit stops the search at each point after that.
+expect {
+    var $seed = 1
+    var $ok = Bool.True
+    var $after_rescale = 0
+    while $seed <= 10 {
+        st0 = Solver.from_cnf(Brute.random_cnf($seed, 20, 91), Bool.False)
+        var $activity = st0.activity
+        var $heap = st0.heap
+        var $hpos = st0.hpos
+        var $v = 0
+        while $v < 20 {
+            (a, h, p, _) = Branch.bump_all($activity, $heap, $hpos, st0.search.heap_len, [$v.to_u32_wrap()], ($v + 1).to_f64() * 1.0e-300)
+            $activity = a
+            $heap = h
+            $hpos = p
+            $v = $v + 1
+        }
+        aged = { ..st0, activity: $activity, heap: $heap, hpos: $hpos, search: { ..st0.search, var_inc: 5.0e99 } }
+        var $limit = 1
+        while $limit <= 12 {
+            (cut, _, _) = Solver.solve(aged, [], $limit)
+            if cut.search.var_inc < 1.0e99 { $after_rescale = $after_rescale + 1 }
+            if !Branch.consistent(cut.activity, cut.heap, cut.hpos, cut.search.heap_len) { $ok = Bool.False }
+            $limit = $limit + 1
+        }
+        $seed = $seed + 1
+    }
+    $ok and $after_rescale > 50
 }
 
 # Differential against the brute-force reference on seeded random 8-var 3-CNFs.
